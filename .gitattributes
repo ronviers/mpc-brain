@@ -1,0 +1,7 @@
+# Auto normalize line endings
+* text=auto
+
+# Explicit declarations
+*.md text eol=lf
+*.py text eol=lf
+*.json text eol=lf
