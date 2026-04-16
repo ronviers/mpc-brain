@@ -1,0 +1,61 @@
+[meta]
+token_budget = 200000
+strip_dividers = true
+
+[session_header]
+enabled = true
+git_log_lines = 5
+show_dirty_files = true
+show_topology = true
+
+# --- ZONES ---
+
+# 1. Core Logic & Implementation
+[[zone]]
+path = "mpc_engine_rfc001.py"
+profiles = ["code", "full"]
+handling = "verbatim"
+priority = 1
+
+[[zone]]
+path = "mpc_session2.py"
+profiles = ["code", "full"]
+handling = "verbatim"
+priority = 2
+
+[[zone]]
+path = "mpc_lattice.py"
+profiles = ["code", "full"]
+handling = "verbatim"
+priority = 3
+
+[[zone]]
+path = "wsl_dev_profile.json"
+profiles = ["code", "full"]
+handling = "verbatim"
+priority = 4
+
+# 2. Documentation, RFCs, & Theory
+[[zone]]
+path = "README.md"
+profiles = ["docs", "full"]
+handling = "verbatim"
+priority = 5
+
+[[zone]]
+path = "RFC-001-MPC-BRAIN.md"
+profiles = ["docs", "full"]
+handling = "verbatim"
+priority = 6
+
+[[zone]]
+path = "SESSION-2-REPORT.md"
+profiles = ["docs", "full"]
+handling = "verbatim"
+priority = 7
+
+[[zone]]
+path = "On the Physical Limits of Boolean Algebra as a Theory of Inference.md"
+profiles = ["docs", "full"]
+handling = "verbatim"
+priority = 8
