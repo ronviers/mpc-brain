@@ -1,0 +1,153 @@
+{
+    "environment": {
+        "host": "Windows",
+        "guest": "WSL2/Linux",
+        "os_kernel": "Windows-11-10.0.26200-SP0"
+    },
+    "mpc_kernel_version": "0.1.0",
+    "git": {
+        "branch": "Not a git repo",
+        "uncommitted_changes": "N/A"
+    },
+    "hardware": {
+        "cpu": "13th Gen Intel(R) Core(TM) i9-13900KF",
+        "ram_gb": 127.79,
+        "gpu": "NVIDIA GeForce RTX 4080 SUPER"
+    },
+    "system_tools": {
+        "windows": {
+            "python": "Python 3.12.8",
+            "cuda_toolkit": null
+        },
+        "wsl": {
+            "python": "Python 3.12.3",
+            "cuda_toolkit": null
+        }
+    },
+    "python_dependencies": {
+        "windows": {
+            "jax": null,
+            "jaxlib": null,
+            "numpy": "2.4.2",
+            "scipy": "1.17.0",
+            "matplotlib": null,
+            "torch": "2.5.1+cu121",
+            "transformers": "4.38.2"
+        },
+        "wsl": {
+            "jax": "0.10.0",
+            "jaxlib": "0.10.0",
+            "numpy": "2.4.4",
+            "scipy": "1.17.1",
+            "matplotlib": "3.10.8",
+            "torch": "2.11.0+cu130",
+            "transformers": "5.5.4"
+        }
+    },
+    "jax_config": {
+        "windows_backend": null,
+        "wsl_backend": "gpu"
+    },
+    "ai_environment": {
+        "ANTHROPIC_API_KEY": "SET",
+        "OPENAI_API_KEY": "SET",
+        "GEMINI_API_KEY": "SET",
+        "MOONSHOT_API_KEY": "SET",
+        "HF_TOKEN": "SET",
+        "OLLAMA_MODELS": "O:\\Models\\data"
+    },
+    "project_structure": {
+        ".gitattributes": "1KB",
+        ".gitignore": "1KB",
+        "HANDOFF_C_PROMPT.md": "20KB [RECENT]",
+        "README.md": "15KB",
+        "SESSION-5-TASK-PROMPT-v3.md": "21KB",
+        "demo.py": "8KB [RECENT]",
+        "docs": {
+            "Mechanisms of Memory Persistence.md": "11KB",
+            "RFC-001-MPC-BRAIN.md": "34KB",
+            "RFC-002-MPC-PROJECT-STRUCTURE.md": "25KB",
+            "RFC-003-MPC-TRACE-FORMAT-001.md": "14KB",
+            "RFC-004-MPC-DYNAMICAL.md": "46KB [RECENT]",
+            "SOP Session Hand-Off.md": "3KB [RECENT]",
+            "dynamical-track": {
+                "MPC_practical_notes.md": "11KB",
+                "SESSION_A_STATE.md": "14KB [RECENT]",
+                "mpc_fdr_atlas.png": "186KB [RECENT]",
+                "mpc_hessian_probe.png": "121KB [RECENT]",
+                "mpc_lattice.py": "55KB [RECENT]",
+                "mpc_separation.png": "141KB [RECENT]",
+                "mpc_trajectories.png": "381KB [RECENT]",
+                "physics_primitives.py": "11KB [RECENT]",
+                "v3_On_the_Dynamical_Limits_of_Boolean_Algebra_as_a_Theory_of_Inference.md": "44KB [RECENT]"
+            },
+            "effector notes.md": "3KB [RECENT]"
+        },
+        "experiments": {
+            "__init__.py": "1KB",
+            "historical": {
+                "SESSION-2-REPORT.md": "11KB",
+                "SESSION-3-REPORT.md": "9KB",
+                "SESSION-4-REPORT.md": "21KB",
+                "__init__.py": "1KB",
+                "mpc_network_demo.png": "156KB",
+                "mpc_network_demo_s4.png": "145KB",
+                "mpc_network_demo_s4_commits.png": "144KB",
+                "mpc_session2.py": "30KB",
+                "mpc_session3.py": "40KB",
+                "mpc_session4.py": "50KB"
+            },
+            "maze": {
+                "__init__.py": "1KB",
+                "manifest.py": "1KB",
+                "report.md": "1KB",
+                "run.py": "1KB"
+            }
+        },
+        "legacy_shims_archived": {
+            "README.md": "1KB",
+            "__init__.py": "1KB",
+            "config.py": "1KB",
+            "pack.py": "1KB",
+            "test_pack.py": "1KB"
+        },
+        "mpc_kernel": {
+            "__init__.py": "1KB",
+            "__version__.py": "1KB",
+            "rfc001": {
+                "__init__.py": "1KB [RECENT]",
+                "bus.py": "1KB [RECENT]",
+                "cluster.py": "7KB [RECENT]",
+                "engine.py": "4KB [RECENT]",
+                "events.py": "1KB [RECENT]",
+                "network.py": "6KB [RECENT]",
+                "phase.py": "1KB [RECENT]",
+                "substrate.py": "4KB [RECENT]"
+            }
+        },
+        "mpc_packs": {
+            "__init__.py": "1KB",
+            "metareasoner": {
+                "README.md": "1KB",
+                "__init__.py": "1KB",
+                "config.py": "1KB",
+                "pack.py": "1KB",
+                "test_pack.py": "1KB"
+            },
+            "symbolic_forebrain": {
+                "README.md": "1KB",
+                "__init__.py": "1KB",
+                "config.py": "1KB",
+                "pack.py": "1KB",
+                "test_pack.py": "1KB"
+            },
+            "z3_socket": {
+                "README.md": "1KB",
+                "__init__.py": "1KB",
+                "config.py": "1KB",
+                "pack.py": "1KB",
+                "test_pack.py": "1KB"
+            }
+        }
+    }
+}

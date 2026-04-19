@@ -507,7 +507,7 @@ def smoke_test_autocluster() -> bool:
 # ================================================================================
 
 # Analytically-designed centers for the Task 5 hello-world demo.
-# Used by the fallback encoder when ANTHROPIC_KEY is absent (DEVIATE-001).
+# Used by the fallback encoder when ANTHROPIC_API_KEY is absent (DEVIATE-001).
 #
 # Design:
 #   P1 "spherical, smooth"      -> center in [0:4] subspace
@@ -537,7 +537,7 @@ class LLMConstraintEncoder:
     """
     Translates natural-language propositions -> fn: R^dim -> float (>= 0).
 
-    Primary:  Anthropic API (claude-sonnet-4-6).  Key from ANTHROPIC_KEY or ctor.
+    Primary:  Anthropic API (claude-sonnet-4-6).  Key from ANTHROPIC_API_KEY or ctor.
     Fallback: deterministic word-hash quadratic encoder.
 
     encode(proposition) -> Callable  (results cached by proposition string)
@@ -565,7 +565,7 @@ class LLMConstraintEncoder:
     def __init__(self, dim, api_key=None):
         self.dim      = dim
         self._cache:  Dict[str, Callable] = {}
-        self._api_key = api_key or os.environ.get("ANTHROPIC_KEY", "")
+        self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         self._use_llm = bool(self._api_key) and _ANTHROPIC_LIB
         self._client  = (_anthropic_mod.Anthropic(api_key=self._api_key)
                          if self._use_llm else None)

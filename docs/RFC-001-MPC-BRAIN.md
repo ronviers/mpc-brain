@@ -669,7 +669,7 @@ A.1.3  LLMConstraintEncoder  (RATIFIED, with DEVIATE-001)
       Add LLMConstraintEncoder as a conforming observation encoder that
       translates natural-language propositions into constraint functions.
 
-   Primary path (requires ANTHROPIC_KEY in environment):
+   Primary path (requires ANTHROPIC_API_KEY in environment):
 
       Calls claude-sonnet-4-6 with a system prompt requiring:
          def fn(v):  (uses only numpy, returns >= 0, equals 0 at one point)
@@ -688,11 +688,11 @@ A.1.3  LLMConstraintEncoder  (RATIFIED, with DEVIATE-001)
       Stiffness λ expressed in units of k_BT, passed separately.
       Does NOT embed λ inside fn.
 
-   DEVIATE-001  (active when ANTHROPIC_KEY is absent):
+   DEVIATE-001  (active when ANTHROPIC_API_KEY is absent):
 
       Status: Known deviation, acceptable for development.
 
-      When ANTHROPIC_KEY is not set, the encoder substitutes a
+      When ANTHROPIC_API_KEY is not set, the encoder substitutes a
       deterministic fallback:
          - For the three hello-world propositions, uses analytically-
            designed quadratic centres (orthogonal subspaces for P1/P2,
@@ -703,7 +703,7 @@ A.1.3  LLMConstraintEncoder  (RATIFIED, with DEVIATE-001)
       Limitation: the fallback does not generalise.  It produces correct
       results for the demo but cannot encode arbitrary propositions.
 
-      Resolution: set ANTHROPIC_KEY in the environment.  See README.md.
+      Resolution: set ANTHROPIC_API_KEY in the environment.  See README.md.
 
 
 A.1.4  Scale Validation (Empirical)  (RATIFIED)
@@ -784,7 +784,7 @@ AMEND-004: ObservationSocket — Formal LLM Connector Interface
          connect(model_endpoint: str, **kwargs)
             Set or update the external model endpoint.
             For the Anthropic API: model_endpoint = "claude-sonnet-4-6",
-            kwargs = {"api_key": os.environ["ANTHROPIC_KEY"]}.
+            kwargs = {"api_key": os.environ["ANTHROPIC_API_KEY"]}.
             MUST NOT raise on missing key; MUST mark self._connected = False
             and fall back to the registered fallback encoder.
 
@@ -802,7 +802,7 @@ AMEND-004: ObservationSocket — Formal LLM Connector Interface
    Canonical implementation (Session 3 target):
 
       AnthropicSocket(ObservationSocket)
-         - Primary:  calls claude-sonnet-4-6 via ANTHROPIC_KEY.
+         - Primary:  calls claude-sonnet-4-6 via ANTHROPIC_API_KEY.
          - Fallback: the existing LLMConstraintEncoder word-hash heuristic.
          - Buffer:   a deque of pending ConstraintSpecs for flush().
          - Cache:    keyed by (proposition, modality, strength).
@@ -857,7 +857,7 @@ SECTION 11 UPDATE  ─  REFERENCE IMPLEMENTATION STATUS
 
    Known deviations from RFC-001 as of Session 2:
 
-      DEVIATE-001  LLM fallback active without ANTHROPIC_KEY.
+      DEVIATE-001  LLM fallback active without ANTHROPIC_API_KEY.
                    (See A.1.3 above.)
 
       DEVIATE-002  Calorimeter not fully separated from brain classes.

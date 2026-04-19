@@ -3,7 +3,7 @@
 **A physically-grounded inference architecture built on Metastable Propositional Calculus.**
 
 [![Status](https://img.shields.io/badge/status-active%20development-blue)]()
-[![RFC](https://img.shields.io/badge/RFC-001%20%28Session%202%20baseline%29-green)]()
+[![Standards](https://img.shields.io/badge/standards-RFC--001%20·%20RFC--002%20·%20RFC--003-green)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 
 ---
@@ -11,57 +11,218 @@
 ## What this is
 
 MPC Brain is a brain architecture — not a neural network, not a symbolic reasoner —
-built on the thermodynamic inference framework described in the
-**Metastable Propositional Calculus** paper (see `Metastable_Propositional_Calculus__MPC__as_a_Thermodynamic_Extension`).
+built on the thermodynamic inference framework described in
+**On the Physical Limits of Boolean Algebra as a Theory of Inference**.
 
 The core idea: propositions are energy wells in a shared configuration space.
-A set of lightweight "engines" evolves stochastically through that space.
-The phase each engine settles in tells you whether the proposition is
-**committed** (c), **suspended** (s), in **conflict** (k), or **reset** (r).
-No gradient descent training. No weight matrices. Just thermodynamics.
+A set of lightweight "engines" evolves stochastically through that space. The
+phase each engine settles in tells you whether the proposition is **committed**
+(c), **suspended** (s), in **conflict** (k), or **reset** (r). No gradient
+descent training. No weight matrices. Just thermodynamics.
 
-```
-                Observation
-                    │
-                    ▼
-          ┌─────────────────────┐
-          │  LLMConstraintEncoder│  (text → fn: R^n → R+)
-          └─────────┬───────────┘
-                    │  constraint functions
-                    ▼
-          ┌─────────────────────┐
-          │    JAXSubstrate      │  (energy landscape)
-          └─────────┬───────────┘
-                    │  gradient / Hessian
-                    ▼
-          ┌─────────────────────┐
-          │    AutoCluster       │  (colony of MetastableEngines)
-          └─────────┬───────────┘
-                    │  PhaseTransitionEvents
-                    ▼
-          ┌─────────────────────┐
-          │      EventBus        │  (publish-subscribe)
-          └─────────────────────┘
-```
+The project is organised in three layers under RFC-002. The kernel carries the
+RFC-001 physics and is closed for modification. Packs are capability modules
+that extend the kernel through three documented plug points. Experiments compose
+packs against a domain and produce reports. The rule is: the physics is not
+negotiable; everything else is.
 
 ---
 
-## Architecture
+## The three layers
 
-The system is governed by **RFC-001-MPC-BRAIN.md**, which specifies the
-interfaces every component must satisfy.  The rule is: the physics
-(Section 3 of the RFC) is not negotiable; everything else is.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         EXPERIMENTS                             │
+│       maze · hello-world · multi-cluster · lattice · …          │
+├─────────────────────────────────────────────────────────────────┤
+│                            PACKS                                │
+│    JAXSubstrate · AutoCluster · Effector · Calorimeter          │
+│   DecayingSubstrate · PersistenceSubstrate · LateralCluster     │
+│      Z3Socket · Metareasoner · SymbolicForebrain · …            │
+├─────────────────────────────────────────────────────────────────┤
+│                           KERNEL                                │
+│  Substrate · Engine · Cluster · Network · EventBus · Phase      │
+├─────────────────────────────────────────────────────────────────┤
+│               PHYSICS · RFC-001 §3 · non-negotiable             │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-| Component | File | Description |
-|-----------|------|-------------|
-| `Substrate` | `mpc_engine_rfc001.py` | Energy landscape. Holds constraints, computes gradients. |
-| `JAXSubstrate` | `mpc_session2.py` | Substrate with `jax.grad` / `jax.hessian` (156× speedup at dim=64 vs finite difference). |
-| `MetastableEngine` | `mpc_engine_rfc001.py` | Single Langevin integrator. Classifies its own phase per §3.1. |
-| `MPCCluster` | `mpc_engine_rfc001.py` | Colony of engines sharing a substrate and budget. |
-| `AutoCluster` | `mpc_session2.py` | Self-organising cluster. Spawns/culls engines. Sheds load when in k-state. |
-| `LLMConstraintEncoder` | `mpc_session2.py` | Converts natural-language propositions to constraint functions via the Anthropic API (fallback: word-hash heuristic). |
-| `EventBus` | `mpc_engine_rfc001.py` | Pub-sub event channel. Only connection between brain and measurement. |
-| `Calorimeter` | `mpc_engine_rfc001.py` | Read-only measurement. Subscribes to bus. Never touches brain components. |
+The **kernel** is the minimal implementation of RFC-001-MPC-BRAIN. Versioned,
+small, frozen against per-session modification.
+
+**Packs** are self-contained modules conforming to one of three plug points:
+`SubstrateExtension` (augments the energy landscape), `EventSubscriber`
+(observes bus events), or `Governor` (mutates cluster state in response to
+signals). Each pack is ~50–200 lines, has a config dataclass, an attach/detach
+lifecycle, and zero cross-pack dependencies except where declared.
+
+**Experiments** select a kernel version, a pack manifest, and a domain. They
+run, produce a report, and do not add capabilities to the kernel. Sessions,
+going forward, are experiments.
+
+A biological correspondence motivates the shape:
+perineuronal nets are decadal, synaptic weights are days, action potentials
+are milliseconds. Each timescale has its own substrate and its own interface.
+Mixing them is forbidden. The project structure applies the same discipline.
+
+---
+
+## Document map
+
+The project is specified across a small set of companion documents. Read them
+in this order if you are new:
+
+| Document | What it is |
+|---|---|
+| `On_the_Physical_Limits_of_Boolean_Algebra_as_a_Theory_of_Inference.md` | The foundational paper. Defines MPC, the four-state algebra, and the Thermodynamic Separation Theorem. |
+| `RFC-001-MPC-BRAIN.md` | The kernel protocol. Specifies substrate, engine, cluster, network, event bus, and the non-amendable energy invariant. |
+| `RFC-002-MPC-PROJECT-STRUCTURE.md` | How the project is organised. Defines kernel, packs, experiments, plug points, promotion rules, and directory layout. |
+| `RFC-003-MPC-TRACE-FORMAT.md` | The wire format for observing an experiment as it runs or after it finishes. |
+| `MPC-VISION-001.md` | The advisory note that preceded RFC-002. Kept as historical record of the reasoning. |
+| `MPC-ANATOMY-001.svg` | A poster-sized visual reference. The three layers, the biology mapping, the promotion ladder. Hang it on a wall. |
+| `Mechanisms_of_Memory_Persistence.md` | Survey of state-of-the-art neurobiology. Source material for the pack roadmap (RFC-002 Appendix A). |
+
+Session reports (`SESSION-N-REPORT.md`) document specific implementation rounds
+and stand as historical record. They are not normative.
+
+---
+
+## Directory layout
+
+```
+mpc-brain/
+├── README.md                          # this file
+├── docs/
+│   ├── RFC-001-MPC-BRAIN.md
+│   ├── RFC-002-MPC-PROJECT-STRUCTURE.md
+│   ├── RFC-003-MPC-TRACE-FORMAT.md
+│   ├── MPC-VISION-001.md
+│   ├── MPC-ANATOMY-001.svg
+│   ├── Mechanisms_of_Memory_Persistence.md
+│   └── On_the_Physical_Limits_of_Boolean_Algebra...md
+│
+├── mpc_kernel/                        # RFC-001 physics, versioned
+│   ├── __version__.py
+│   └── rfc001/
+│       ├── phase.py                   # Phase enum, classify()
+│       ├── substrate.py               # base Substrate
+│       ├── engine.py                  # MetastableEngine
+│       ├── cluster.py                 # MPCCluster
+│       ├── network.py                 # Network
+│       ├── bus.py                     # EventBus
+│       └── events.py                  # canonical event types
+│
+├── mpc_packs/                         # capability modules
+│   ├── jax_substrate/
+│   ├── auto_cluster/
+│   ├── effector/
+│   ├── calorimeter/
+│   ├── decaying_substrate/
+│   ├── persistence_substrate/
+│   ├── z3_socket/
+│   ├── metareasoner/
+│   ├── symbolic_forebrain/
+│   └── …
+│
+└── experiments/                       # compositions + reports
+    ├── hello_world/
+    ├── multi_cluster/
+    ├── maze/
+    └── lattice/
+```
+
+Every pack directory contains at minimum `pack.py`, `config.py`,
+`test_pack.py`, and `README.md`. Every experiment directory contains at
+minimum `manifest.py`, `run.py`, and `report.md`. RFC-002 §6 is normative
+on this layout.
+
+---
+
+## Adding a pack
+
+Packs are the operational unit of growth. When you want a new capability —
+temporal decay on the frustration graph, a new constraint encoder, a
+biological mechanism from `Mechanisms_of_Memory_Persistence.md` — you write
+a pack.
+
+The shape is always the same:
+
+1. Pick a plug point. `SubstrateExtension` if the capability changes how the
+   energy landscape is computed, updated, or maintained. `EventSubscriber`
+   if it observes events without mutating anything. `Governor` if it reads
+   signals and issues mutations to a cluster.
+2. Create `mpc_packs/<your_pack>/` and write `pack.py`, `config.py`,
+   `test_pack.py`, `README.md`.
+3. Expose `attach(...)`, `detach(...)`, and at least one read or extension
+   method per the plug point's contract.
+4. Declare dependencies on other packs in the config dataclass. Never import
+   a pack you have not declared.
+5. Preserve the RFC-001 §3 invariants. Never shadow a kernel type. Never
+   modify a kernel file.
+
+If the capability would require mutating engine internals directly,
+redefining a Phase, or shadowing an event type, it is not a pack. It is a
+kernel revision and proceeds under RFC-002 §5.3. The default answer to "is
+this a kernel revision?" is no.
+
+RFC-002 Appendix A lists eight proposed packs derived from the persistence
+doc (PNN-Archive, KIBRA-Shield, PKMzeta-Maintenance, SWR-Replay,
+STC-Tagging, ActivitySilent, EngramReconstruction, Methylation-Lock),
+with size estimates and dependencies. Each is independent. Pick one, write
+it, attach it to an experiment.
+
+---
+
+## Running an experiment
+
+An experiment is a composition, not a script.
+
+```python
+# experiments/maze/manifest.py
+KERNEL_REQUIRED = "0.4.0"
+PACKS = [
+    ("jax_substrate",         {}),
+    ("auto_cluster",          {}),
+    ("effector",              {}),
+    ("decaying_substrate",    {}),
+    ("persistence_substrate", {"usage_coef": 1.0, "outcome_coef": 0.3}),
+    ("z3_socket",             {}),
+    ("metareasoner",          {"window": 50}),
+    ("symbolic_forebrain",    {"plan_library": maze_rules}),
+]
+EXPERIMENT_CONFIG = {"maze_w": 7, "maze_h": 7, "n_steps": 1500, ...}
+```
+
+`experiments/<name>/run.py` loads the manifest, attaches the packs to a fresh
+kernel, runs the workload, writes trace data and the report. The report
+follows the SESSION-N-REPORT template: final results table, per-component
+sections, RFC-001 + RFC-002 conformance checklists, artefacts list, what
+is open.
+
+Experiments may emit RFC-003 trace frames (JSONL) for live or post-hoc
+visualization. A `TraceWriter` pack is planned — until it lands, experiments
+that want traces write them inline.
+
+---
+
+## Hello World
+
+The canonical kernel-only demo lives at `experiments/hello_world/`. It loads
+two contradictory propositions simultaneously, observes the cluster enter
+k-state and shed the weaker, then adds a disambiguating proposition and
+observes commitment.
+
+- P1: *"the object is spherical and smooth"* (ball)
+- P2: *"the object has sharp corners and flat faces"* (prism)
+- P3: *"the object fits in one hand and is used for writing"* (pen ≈ prism-family)
+
+The cluster commits to the P2/P3 neighbourhood. Distance to P1 centre: 3.67.
+Distance to P2 centre: 0.85. The ball hypothesis is correctly rejected.
+
+This demo uses only the kernel plus the default pack manifest
+(`jax_substrate`, `auto_cluster`, `effector`, `calorimeter`). It is the
+reference for "the kernel works." Any candidate kernel revision must not
+break it.
 
 ---
 
@@ -69,175 +230,123 @@ interfaces every component must satisfy.  The rule is: the physics
 
 Every engine is always in exactly one of four states:
 
-| Phase | Meaning | Energy condition |
-|-------|---------|-----------------|
-| **c** (committed) | Found a stable minimum; ready to act | E < E_c AND H ≻ 0 |
+| Phase | Meaning | Condition |
+|---|---|---|
+| **c** (committed) | Found a stable minimum; ready to act | E < E_c ∧ H ≻ 0 |
 | **s** (suspended) | Holding a hypothesis under uncertainty | E_c ≤ E < E_s |
-| **k** (conflict) | Contradictory constraints; cannot commit | E ≥ E_s OR H ⊁ 0 |
+| **k** (conflict) | Contradictory constraints; cannot commit | E ≥ E_s ∨ H ⊁ 0 |
 | **r** (reset) | Budget exhausted; information erased | budget exceeded |
 
-A reset costs at least k_BT·ln(2) per bit erased (Landauer bound), emitted as a `LandauerEvent`.
+A reset costs at least k_BT·ln(2) per bit erased (Landauer bound), emitted
+as a `LandauerEvent`.
 
 ---
 
-## Quickstart
+## Theoretical basis
 
-```bash
-git clone <repo>
-cd mpc-brain
-pip install numpy jax matplotlib anthropic
-```
-
-Set your Anthropic API key:
-
-```bash
-export ANTHROPIC_KEY=sk-ant-...
-```
-
-Run Session 2 (all tasks):
-
-```bash
-python mpc_session2.py
-```
-
-Expected output:
-
-```
-Task 1  extrap speedup @ dim=64: 156x  jax_ok=True
-Task 2  worst ratio:             0.4868  PASS
-Task 3  AutoCluster smoke:        PASS
-Task 4  encoder mode:             api          (or 'fallback' without key)
-Task 5  hello-world:             PASS
-```
-
----
-
-## Hello World
-
-The canonical demo is `hello_world()` in `mpc_session2.py`.
-
-**Phase A:** load two contradictory propositions simultaneously:
-- P1: *"the object is spherical and smooth"* (ball)
-- P2: *"the object has sharp corners and flat faces"* (prism)
-
-The cluster enters k-state (conflict), sheds the weaker constraint (P1), and
-suspends on P2.
-
-**Phase B:** add the disambiguating proposition:
-- P3: *"the object fits in one hand and is used for writing"* (pen ≈ prism-family)
-
-The cluster commits to the P2/P3 neighbourhood.  Distance to P1 centre: 3.67.
-Distance to P2 centre: 0.85.  The ball hypothesis is correctly rejected.
-
----
-
-## JAX Acceleration
-
-`JAXSubstrate` uses `jax.jit(jax.grad(...))` and `jax.jit(jax.hessian(...))`.
-
-Stiffness values are baked into the XLA computation at compile time.  Any call
-to `register`, `deregister`, or `update_lambda` increments a version counter
-that forces recompilation on the next gradient call.  This ensures stiffness
-changes are never silently stale.
-
-Measured on CPU (no GPU):
-
-| Backend | dim | Steps | Time |
-|---------|-----|-------|------|
-| Finite Difference | 8 | 1000 | 6.9 s (actual) |
-| Finite Difference | 64 | 1000 | ~400 s (extrapolated, O(n²)) |
-| JAX | 64 | 1000 | 2.6 s (actual) |
-
-**156× extrapolated speedup on CPU.  GPU would add further hardware parallelism.**
-
----
-
-## LLM Connector
-
-`LLMConstraintEncoder` is the bridge between language and physics.
-
-With `ANTHROPIC_KEY` set, it calls `claude-sonnet-4-6` with a system prompt
-that requires a Python function `fn(v)` returning a non-negative scalar.
-The response is executed in a restricted namespace (`{np, __builtins__: {}}`)
-and sanity-checked before use.
-
-Without an API key, it falls back to a deterministic word-hash quadratic
-encoder (suitable for the hello-world demo; not suitable for production).
-
-```python
-encoder = LLMConstraintEncoder(dim=32)
-fn = encoder.encode("the object is heavier than 1 kg")
-# fn: R^32 → R+, cached by proposition string
-```
-
-A formal connector interface (`ObservationSocket`) is specified in
-**RFC-001 AMEND-004** and will be implemented in Session 3.
-
----
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_KEY` | For LLM encoding | API key for `claude-sonnet-4-6` |
-
----
-
-## Project Structure
-
-```
-mpc-brain/
-├── README.md                          # This file
-├── RFC-001-MPC-BRAIN.md              # Protocol specification
-├── SESSION-2-REPORT.md               # Session 2 implementation report
-├── mpc_engine_rfc001.py              # Session 1: core engine (base classes)
-├── mpc_session2.py                   # Session 2: JAXSubstrate, AutoCluster,
-│                                     #            LLMConstraintEncoder, hello-world
-├── mpc_lattice.py                    # Lattice substrate (exploratory)
-├── wsl_dev_profile.json              # Dev environment config
-└── Metastable_Propositional_Calculus__MPC__as_a_Thermodynamic_Extension
-                                      # Foundational paper
-```
-
----
-
-## Theoretical Basis
-
-The phase classifier is a consequence of non-equilibrium thermodynamics applied
-to inference.  It is not a design choice.  The four invariants in RFC-001 §3
-are physical:
+The phase classifier is a consequence of non-equilibrium thermodynamics
+applied to inference. It is not a design choice. The four invariants in
+RFC-001 §3 are physical:
 
 1. **Phase classification** — by energy and Hessian spectrum only.
 2. **Landauer bound** — resets cost k_BT·ln(2) per bit, always emitted.
 3. **Budget enforcement** — no step exceeds E\*.
 4. **Maintenance cost** — suspended engines exert a restoring force.
 
-The **Thermodynamic Separation Theorem** (RFC-001 §4.3) bounds the number of
-simultaneously suspended engines:
+The **Thermodynamic Separation Theorem** (RFC-001 §4.3) bounds the number
+of simultaneously suspended engines:
 
 ```
 N_max = √(2·E* / (α · ε_min · d_avg))
 ```
 
-Session 2 empirically verified this bound holds across N = 5…50 constraints
-(worst observed ratio: 0.49, well below the 1.15 tolerance).
+This was empirically verified across N = 5…50 constraints (worst observed
+ratio: 0.49, below the 1.15 tolerance) in an earlier session. The theorem
+matters because it is the formal statement of why a bounded brain cannot
+maintain unbounded hypotheses — premature commitment is not a bug, it is
+what the second law requires.
+
+The full derivation and its cognitive corollaries (frame problem, working
+memory as metastability, Landauer gap) are in the foundational paper.
+
+---
+
+## Performance notes
+
+The `jax_substrate` pack uses `jax.jit(jax.grad(...))` and
+`jax.jit(jax.hessian(...))`. Stiffness values bake into the XLA computation
+at compile time; `register`, `deregister`, and `update_lambda` each bump
+a version counter that forces recompilation on the next call, so stiffness
+changes are never silently stale.
+
+Measured on CPU (no GPU):
+
+| Backend | dim | Steps | Time |
+|---|---|---|---|
+| Finite Difference | 8 | 1000 | 6.9 s (actual) |
+| Finite Difference | 64 | 1000 | ~400 s (extrapolated, O(n²)) |
+| JAX | 64 | 1000 | 2.6 s (actual) |
+
+~156× extrapolated speedup on CPU. GPU adds further hardware parallelism.
+
+---
+
+## Environment
+
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | For the `llm_encoder` pack only | API key for the constraint encoder that converts natural language to constraint functions. |
+
+No other environment configuration is required. All packs are opt-in per
+experiment manifest; the default manifest has no external dependencies.
+
+---
+
+## Status
+
+RFC-002 is normative as of April 2026. The migration from the flat
+one-file-per-session layout is **staged**:
+
+- **Step 0** (kernel surgery and directory scaffold) — planned for Session 5.
+- **Pack carve-out** — S2/S3/S4 capabilities are moved into `mpc_packs/` opportunistically as new experiments need them. S6 is the first dedicated housekeeping round.
+- **First RFC-002-native session** — Session 5 (maze experiment). See `SESSION-5-TASK-PROMPT-v3.md`.
+
+If you are reading this before Session 5 has completed, some of the
+directory structure above describes a target, not current reality. The
+legacy files (`mpc_engine_rfc001.py`, `mpc_session2.py`, `mpc_session3.py`,
+`mpc_session4.py`) remain in place and functional; imports from them are
+preserved via a deprecation shim during migration.
 
 ---
 
 ## Roadmap
 
-| Session | Scope |
-|---------|-------|
-| 1 | Core engine: Substrate, MetastableEngine, MPCCluster, EventBus, Calorimeter |
-| 2 | JAXSubstrate (156× speedup), AutoCluster, LLMConstraintEncoder, hello-world demo |
-| 3 | AMEND-001 (temporal frustration decay), AMEND-003 (lateral maintenance field), ObservationSocket (formal LLM connector), multi-cluster network demo |
+| Session | Scope | Status |
+|---|---|---|
+| 1 | Core engine: Substrate, MetastableEngine, MPCCluster, EventBus, Calorimeter | complete |
+| 2 | JAXSubstrate, AutoCluster, LLMConstraintEncoder, hello-world demo | complete |
+| 3 | Temporal frustration decay, lateral maintenance field, ObservationSocket, multi-cluster demo | complete |
+| 4 | Effector (total-cost accounting), PersistenceSubstrate, network demo | complete |
+| 5 | **First RFC-002-native session.** Kernel surgery, three new packs (Z3Socket, Metareasoner, SymbolicForebrain), first maze navigation experiment. | in progress |
+| 6 | Housekeeping: carve out S2/S3/S4 packs, remove deprecation shim, `TraceWriter` pack, sliding-window retention. | planned |
+| 7 | Tolman experimental battery: latent learning, detour problems, shortcut problems, reversal learning. First full test of cognitive-map claims. | planned |
+| 8 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
+| 9+ | Persistence-doc packs land per RFC-002 Appendix A. | queued |
+
+The cleanest stopping condition: if Session 7's behavioural curves
+qualitatively match Tolman's 1940s rat data, the substrate is doing real
+cognitive work and there is something publishable. If they don't, there
+are specific mechanisms to fix — and under RFC-002, fixing them no longer
+means rewriting a thousand-line session file.
 
 ---
 
 ## Contributing
 
-This project is a living document.  Amendments to the RFC are welcome.
-The physical invariants in §3 are not amendable.  Everything else is.
+This project is a living document. Amendments to RFC-001 are welcome; the
+physical invariants in §3 are not amendable. Amendments to RFC-002 follow
+the promotion rules in §5. Comments and objections are invited in the
+spirit stated in the foundational paper: as tests, not obstacles.
 
 Developed collaboratively between a hobbyist researcher and Claude (Anthropic),
 April 2026.

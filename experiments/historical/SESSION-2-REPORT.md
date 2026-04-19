@@ -175,7 +175,7 @@ non-negative scalar.  The response is executed in a restricted namespace
 (`{np, __builtins__: {}}`) and sanity-checked (`fn(zeros) >= 0`).
 Markdown fences are stripped before evaluation.
 
-**Fallback path (DEVIATE-001):** When `ANTHROPIC_KEY` is absent (as in this
+**Fallback path (DEVIATE-001):** When `ANTHROPIC_API_KEY` is absent (as in this
 environment), deterministic analytic centres are returned for the three
 hello-world propositions.  All other propositions receive a bag-of-words
 word-hash quadratic centre.
@@ -259,12 +259,12 @@ the P2/P3 (prism/pen) family.
 
 ### DEVIATE-001 — Fallback encoder (no API key in test env)
 
-The LLM path requires `ANTHROPIC_KEY` in the environment.  The fallback
+The LLM path requires `ANTHROPIC_API_KEY` in the environment.  The fallback
 produces correct results for the three demo propositions but relies on
 hardcoded analytic centres.  In production, the API path generates arbitrary
 constraint functions from any natural-language input.
 
-**Resolution:** Export `ANTHROPIC_KEY` in the runtime environment.
+**Resolution:** Export `ANTHROPIC_API_KEY` in the runtime environment.
 
 ### Separation theorem trivially satisfied at high N
 

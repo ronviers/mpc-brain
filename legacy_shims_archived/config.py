@@ -1,0 +1,6 @@
+from dataclasses import dataclass, field
+from typing import List
+
+@dataclass
+class LegacyShimsConfig:
+    dependencies: List[str] = field(default_factory=list)
