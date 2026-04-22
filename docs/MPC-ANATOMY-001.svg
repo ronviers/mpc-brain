@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 2360" width="1400" height="2360" font-family="Georgia, 'Times New Roman', serif">
+
+  <!-- ============================================================ -->
+  <!-- BACKGROUND                                                   -->
+  <!-- ============================================================ -->
+  <rect width="1400" height="2360" fill="#F4EFE6"/>
+
+  <!-- subtle border -->
+  <rect x="40" y="40" width="1320" height="2280" fill="none" stroke="#2A3540" stroke-width="1.2" opacity="0.4"/>
+
+  <!-- ============================================================ -->
+  <!-- HEADER                                                       -->
+  <!-- ============================================================ -->
+  <g>
+    <text x="80" y="110" font-size="44" font-weight="600" fill="#1A1A1A">MPC-ANATOMY-001</text>
+    <text x="80" y="148" font-size="20" font-style="italic" fill="#6B6058">A blocking-in for kernel, packs, and experiments</text>
+    <text x="1320" y="110" font-size="16" fill="#6B6058" text-anchor="end">Companion to MPC-VISION-001</text>
+    <text x="1320" y="134" font-size="14" fill="#6B6058" text-anchor="end">April 2026</text>
+    <text x="1320" y="156" font-size="14" fill="#6B6058" text-anchor="end">Draft · for annotation</text>
+    <line x1="80" y1="180" x2="1320" y2="180" stroke="#2A3540" stroke-width="1.5"/>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1: THE THREE LAYERS (strata)                         -->
+  <!-- ============================================================ -->
+  <g>
+    <!-- section label -->
+    <text x="80" y="230" font-size="14" letter-spacing="3" fill="#A8814C" font-family="Helvetica, Arial, sans-serif">SECTION 1</text>
+    <text x="80" y="270" font-size="32" font-weight="500" fill="#1A1A1A">The three layers</text>
+    <text x="80" y="298" font-size="15" font-style="italic" fill="#6B6058">Stability decreases as you read upward. Mutability increases. The kernel carries the weight.</text>
+
+    <!-- ===== EXPERIMENTS BAND (top, lightest) ===== -->
+    <g>
+      <rect x="80" y="320" width="1100" height="120" fill="#8FA882" opacity="0.75" stroke="#5C7256" stroke-width="1.5"/>
+      <text x="100" y="352" font-size="18" font-weight="600" fill="#FFFFFF" letter-spacing="2">EXPERIMENTS</text>
+      <text x="100" y="372" font-size="12" fill="#FFFFFF" font-family="Helvetica, Arial, sans-serif" opacity="0.9">ephemeral · composable · per-run · sessions live here</text>
+
+      <!-- experiment tiles -->
+      <g font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#1A1A1A">
+        <rect x="100" y="390" width="180" height="36" fill="#F4EFE6" stroke="#5C7256" stroke-width="1"/>
+        <text x="190" y="413" text-anchor="middle">maze · S5</text>
+
+        <rect x="295" y="390" width="180" height="36" fill="#F4EFE6" stroke="#5C7256" stroke-width="1"/>
+        <text x="385" y="413" text-anchor="middle">hello-world · S2</text>
+
+        <rect x="490" y="390" width="180" height="36" fill="#F4EFE6" stroke="#5C7256" stroke-width="1"/>
+        <text x="580" y="413" text-anchor="middle">multi-cluster · S3/S4</text>
+
+        <rect x="685" y="390" width="180" height="36" fill="#F4EFE6" stroke="#5C7256" stroke-width="1"/>
+        <text x="775" y="413" text-anchor="middle">lattice · exploratory</text>
+
+        <rect x="880" y="390" width="180" height="36" fill="#F4EFE6" stroke="#5C7256" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="970" y="413" text-anchor="middle" fill="#5C7256">Tolman battery · S7</text>
+      </g>
+
+      <!-- right margin annotation -->
+      <text x="1200" y="358" font-size="13" fill="#6B6058" font-style="italic">change daily</text>
+      <text x="1200" y="376" font-size="13" fill="#6B6058" font-style="italic">composed of:</text>
+      <text x="1200" y="394" font-size="13" fill="#6B6058" font-style="italic">  kernel ver +</text>
+      <text x="1200" y="412" font-size="13" fill="#6B6058" font-style="italic">  pack manifest +</text>
+      <text x="1200" y="430" font-size="13" fill="#6B6058" font-style="italic">  domain</text>
+    </g>
+
+    <!-- ===== PACKS BAND (middle) ===== -->
+    <g>
+      <rect x="80" y="455" width="1100" height="280" fill="#B8593A" opacity="0.85" stroke="#7A3A24" stroke-width="1.5"/>
+      <text x="100" y="487" font-size="18" font-weight="600" fill="#FFFFFF" letter-spacing="2">PACKS</text>
+      <text x="100" y="507" font-size="12" fill="#FFFFFF" font-family="Helvetica, Arial, sans-serif" opacity="0.9">swappable · config-driven · 50–200 LOC each · zero cross-coupling unless declared</text>
+
+      <!-- divider for default vs opt-in -->
+      <line x1="500" y1="455" x2="500" y2="735" stroke="#7A3A24" stroke-width="1" stroke-dasharray="4,4" opacity="0.6"/>
+
+      <!-- DEFAULT MANIFEST (left side) -->
+      <text x="100" y="535" font-size="12" font-weight="600" fill="#FFFFFF" letter-spacing="1.5" font-family="Helvetica, Arial, sans-serif">DEFAULT MANIFEST</text>
+      <text x="100" y="551" font-size="11" fill="#FFFFFF" opacity="0.8" font-style="italic">loaded unless an experiment opts out</text>
+      <g font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1A1A1A">
+        <rect x="100" y="565" width="170" height="32" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="185" y="586" text-anchor="middle">JAXSubstrate</text>
+
+        <rect x="285" y="565" width="170" height="32" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="370" y="586" text-anchor="middle">AutoCluster</text>
+
+        <rect x="100" y="610" width="170" height="32" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="185" y="631" text-anchor="middle">Effector</text>
+
+        <rect x="285" y="610" width="170" height="32" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="370" y="631" text-anchor="middle">Calorimeter</text>
+      </g>
+      <text x="100" y="678" font-size="11" fill="#FFFFFF" opacity="0.8" font-family="Helvetica, Arial, sans-serif">these graduated to "default" because</text>
+      <text x="100" y="694" font-size="11" fill="#FFFFFF" opacity="0.8" font-family="Helvetica, Arial, sans-serif">two or more experiments depend on them</text>
+      <text x="100" y="710" font-size="11" fill="#FFFFFF" opacity="0.8" font-family="Helvetica, Arial, sans-serif">— but the kernel still doesn't require them.</text>
+
+      <!-- OPT-IN PACKS (right side) -->
+      <text x="520" y="535" font-size="12" font-weight="600" fill="#FFFFFF" letter-spacing="1.5" font-family="Helvetica, Arial, sans-serif">OPT-IN PACKS</text>
+      <text x="520" y="551" font-size="11" fill="#FFFFFF" opacity="0.8" font-style="italic">loaded by name in an experiment manifest</text>
+
+      <g font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1A1A1A">
+        <!-- existing packs (carved from sessions) -->
+        <rect x="520" y="565" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="597" y="584" text-anchor="middle">DecayingSubstrate</text>
+
+        <rect x="685" y="565" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="762" y="584" text-anchor="middle">LateralCluster</text>
+
+        <rect x="850" y="565" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="927" y="584" text-anchor="middle">PersistenceSubstrate</text>
+
+        <rect x="1015" y="565" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="1092" y="584" text-anchor="middle">ObservationSocket</text>
+
+        <!-- proposed S5 packs -->
+        <rect x="520" y="600" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="597" y="619" text-anchor="middle">Z3-Socket</text>
+
+        <rect x="685" y="600" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="762" y="619" text-anchor="middle">Metareasoner</text>
+
+        <rect x="850" y="600" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="927" y="619" text-anchor="middle">SymbolicForebrain</text>
+
+        <rect x="1015" y="600" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1"/>
+        <text x="1092" y="619" text-anchor="middle">LLMConstraintEncoder</text>
+
+        <!-- biology packs (proposed, dashed border) -->
+        <rect x="520" y="640" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="597" y="659" text-anchor="middle">PNN-Archive</text>
+
+        <rect x="685" y="640" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="762" y="659" text-anchor="middle">KIBRA-Shield</text>
+
+        <rect x="850" y="640" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="927" y="659" text-anchor="middle">PKMζ-Maintenance</text>
+
+        <rect x="1015" y="640" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="1092" y="659" text-anchor="middle">SWR-Replay</text>
+
+        <rect x="520" y="675" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="597" y="694" text-anchor="middle">STC-Tagging</text>
+
+        <rect x="685" y="675" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="762" y="694" text-anchor="middle">ActivitySilent</text>
+
+        <rect x="850" y="675" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="927" y="694" text-anchor="middle">EngramReconstruction</text>
+
+        <rect x="1015" y="675" width="155" height="28" fill="#F4EFE6" stroke="#7A3A24" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="1092" y="694" text-anchor="middle">Methylation-Lock</text>
+      </g>
+
+      <text x="520" y="722" font-size="11" fill="#FFFFFF" opacity="0.8" font-family="Helvetica, Arial, sans-serif" font-style="italic">solid border = exists or being carved out · dashed border = proposed (persistence-doc roadmap)</text>
+    </g>
+
+    <!-- ===== KERNEL BAND (bottom, heaviest) ===== -->
+    <g>
+      <rect x="80" y="750" width="1100" height="160" fill="#2A3540" stroke="#1A1A1A" stroke-width="2"/>
+      <text x="100" y="782" font-size="18" font-weight="600" fill="#F4EFE6" letter-spacing="2">KERNEL</text>
+      <text x="100" y="802" font-size="12" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif" opacity="0.85">frozen · versioned · changes only by vision-note revision · the load-bearing element</text>
+
+      <g font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#F4EFE6" font-weight="500">
+        <rect x="100" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="170" y="844" text-anchor="middle">Substrate</text>
+
+        <rect x="255" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="325" y="844" text-anchor="middle">Engine</text>
+
+        <rect x="410" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="480" y="844" text-anchor="middle">Cluster</text>
+
+        <rect x="565" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="635" y="844" text-anchor="middle">Network</text>
+
+        <rect x="720" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="790" y="844" text-anchor="middle">EventBus</text>
+
+        <rect x="875" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="945" y="844" text-anchor="middle">Phase {c,s,k,r}</text>
+
+        <rect x="1030" y="820" width="140" height="38" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+        <text x="1100" y="844" text-anchor="middle">Event types</text>
+      </g>
+
+      <text x="100" y="888" font-size="11" fill="#F4EFE6" opacity="0.7" font-family="Helvetica, Arial, sans-serif">RFC-001 §3 invariants enforced here. Phase classification, Landauer cost, budget enforcement, maintenance force.</text>
+    </g>
+
+    <!-- ===== PHYSICS sliver (under kernel) ===== -->
+    <g>
+      <rect x="80" y="918" width="1100" height="42" fill="#1A1A1A"/>
+      <text x="100" y="945" font-size="14" font-weight="600" fill="#A8814C" letter-spacing="2.5" font-family="Helvetica, Arial, sans-serif">PHYSICS · RFC-001 §3 · NON-NEGOTIABLE</text>
+      <text x="1160" y="945" font-size="12" fill="#F4EFE6" opacity="0.75" font-family="Helvetica, Arial, sans-serif" text-anchor="end" font-style="italic">the bedrock</text>
+    </g>
+
+    <!-- annotations down the left margin -->
+    <g font-size="11" fill="#6B6058" font-style="italic" font-family="Helvetica, Arial, sans-serif">
+      <text x="56" y="380" text-anchor="end" transform="rotate(-90 56 380)">change per run</text>
+      <text x="56" y="600" text-anchor="end" transform="rotate(-90 56 600)">change occasionally</text>
+      <text x="56" y="830" text-anchor="end" transform="rotate(-90 56 830)">change rarely</text>
+      <text x="56" y="940" text-anchor="end" transform="rotate(-90 56 940)">never</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2: BRAIN ↔ MPC MAPPING                              -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 1010)">
+    <text x="80" y="20" font-size="14" letter-spacing="3" fill="#A8814C" font-family="Helvetica, Arial, sans-serif">SECTION 2</text>
+    <text x="80" y="60" font-size="32" font-weight="500" fill="#1A1A1A">Brain ↔ MPC mapping</text>
+    <text x="80" y="88" font-size="15" font-style="italic" fill="#6B6058">Each row is a correspondence. Read it as: biology already solved this; we are naming our version of the same thing.</text>
+
+    <!-- column headers -->
+    <text x="280" y="135" font-size="14" font-weight="600" fill="#6B6058" letter-spacing="2" font-family="Helvetica, Arial, sans-serif" text-anchor="middle">BIOLOGY</text>
+    <text x="900" y="135" font-size="14" font-weight="600" fill="#6B6058" letter-spacing="2" font-family="Helvetica, Arial, sans-serif" text-anchor="middle">MPC</text>
+    <text x="1180" y="135" font-size="14" font-weight="600" fill="#6B6058" letter-spacing="2" font-family="Helvetica, Arial, sans-serif" text-anchor="middle">LAYER</text>
+    <line x1="80" y1="148" x2="1320" y2="148" stroke="#6B6058" stroke-width="0.8"/>
+
+    <!-- rows: Y starts at 175, step 38 -->
+    <g font-family="Georgia, serif" font-size="16" fill="#1A1A1A">
+      <!-- row helper template applied per row -->
+      <!-- row 1: neuron / engine -->
+      <text x="100" y="180">neuron</text>
+      <text x="900" y="180" text-anchor="middle">MetastableEngine</text>
+      <line x1="370" y1="175" x2="800" y2="175" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="165" width="100" height="20" fill="#2A3540"/>
+      <text x="1180" y="180" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">KERNEL</text>
+
+      <!-- row 2 -->
+      <text x="100" y="218">cortical column / circuit</text>
+      <text x="900" y="218" text-anchor="middle">MPCCluster</text>
+      <line x1="370" y1="213" x2="800" y2="213" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="203" width="100" height="20" fill="#2A3540"/>
+      <text x="1180" y="218" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">KERNEL</text>
+
+      <!-- row 3 -->
+      <text x="100" y="256">white-matter projection</text>
+      <text x="900" y="256" text-anchor="middle">EventBus</text>
+      <line x1="370" y1="251" x2="800" y2="251" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="241" width="100" height="20" fill="#2A3540"/>
+      <text x="1180" y="256" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">KERNEL</text>
+
+      <!-- row 4 -->
+      <text x="100" y="294">extracellular matrix</text>
+      <text x="900" y="294" text-anchor="middle">Substrate</text>
+      <line x1="370" y1="289" x2="800" y2="289" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="279" width="100" height="20" fill="#2A3540"/>
+      <text x="1180" y="294" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">KERNEL</text>
+
+      <!-- row 5 -->
+      <text x="100" y="332">sensory transducer (retina, cochlea)</text>
+      <text x="900" y="332" text-anchor="middle">ObservationSocket</text>
+      <line x1="450" y1="327" x2="800" y2="327" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="317" width="100" height="20" fill="#B8593A"/>
+      <text x="1180" y="332" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK</text>
+
+      <!-- row 6 -->
+      <text x="100" y="370">fMRI / EEG / electrode</text>
+      <text x="900" y="370" text-anchor="middle">Calorimeter · Effector · Metareasoner</text>
+      <line x1="380" y1="365" x2="710" y2="365" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="355" width="100" height="20" fill="#B8593A"/>
+      <text x="1180" y="370" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK</text>
+
+      <!-- row 7 -->
+      <text x="100" y="408">neuromodulation (DA, ACh, NE)</text>
+      <text x="900" y="408" text-anchor="middle">SymbolicForebrain (Governor)</text>
+      <line x1="410" y1="403" x2="755" y2="403" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="393" width="100" height="20" fill="#B8593A"/>
+      <text x="1180" y="408" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK</text>
+
+      <!-- divider for biology that maps to proposed packs -->
+      <line x1="80" y1="430" x2="1320" y2="430" stroke="#A8814C" stroke-width="0.4" stroke-dasharray="3,3" opacity="0.6"/>
+      <text x="700" y="448" font-size="11" fill="#6B6058" font-style="italic" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">— below: persistence-doc mechanisms with proposed pack names —</text>
+
+      <!-- row 8 -->
+      <text x="100" y="478">perineuronal net</text>
+      <text x="900" y="478" text-anchor="middle">PNN-Archive</text>
+      <line x1="305" y1="473" x2="820" y2="473" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="463" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="478" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+
+      <!-- row 9 -->
+      <text x="100" y="516">KIBRA–PKMζ phase-separated droplet</text>
+      <text x="900" y="516" text-anchor="middle">KIBRA-Shield + PKMζ-Maintenance</text>
+      <line x1="455" y1="511" x2="700" y2="511" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="501" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="516" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+
+      <!-- row 10 -->
+      <text x="100" y="554">sharp-wave ripple replay (NREM)</text>
+      <text x="900" y="554" text-anchor="middle">SWR-Replay</text>
+      <line x1="425" y1="549" x2="830" y2="549" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="539" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="554" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+
+      <!-- row 11 -->
+      <text x="100" y="592">synaptic tagging &amp; capture</text>
+      <text x="900" y="592" text-anchor="middle">STC-Tagging</text>
+      <line x1="380" y1="587" x2="830" y2="587" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="577" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="592" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+
+      <!-- row 12 -->
+      <text x="100" y="630">activity-silent working memory</text>
+      <text x="900" y="630" text-anchor="middle">ActivitySilent</text>
+      <line x1="410" y1="625" x2="825" y2="625" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="615" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="630" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+
+      <!-- row 13 -->
+      <text x="100" y="668">DNA methylation lock</text>
+      <text x="900" y="668" text-anchor="middle">Methylation-Lock</text>
+      <line x1="335" y1="663" x2="810" y2="663" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="653" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="668" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+
+      <!-- row 14 -->
+      <text x="100" y="706">engram reconstruction (Lei et al. 2025)</text>
+      <text x="900" y="706" text-anchor="middle">EngramReconstruction</text>
+      <line x1="475" y1="701" x2="785" y2="701" stroke="#A8814C" stroke-width="0.6" opacity="0.5"/>
+      <rect x="1130" y="691" width="100" height="20" fill="#B8593A" stroke="#7A3A24" stroke-dasharray="3,2"/>
+      <text x="1180" y="706" text-anchor="middle" fill="#F4EFE6" font-size="11" font-family="Helvetica, Arial, sans-serif" letter-spacing="1.5">PACK*</text>
+    </g>
+
+    <text x="80" y="745" font-size="11" fill="#6B6058" font-style="italic" font-family="Helvetica, Arial, sans-serif">* = proposed; not yet implemented. See MPC-VISION-001 §7 for size estimates and dependencies.</text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3: ANATOMY OF A PACK (PNN worked example)            -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 1790)">
+    <text x="80" y="20" font-size="14" letter-spacing="3" fill="#A8814C" font-family="Helvetica, Arial, sans-serif">SECTION 3</text>
+    <text x="80" y="60" font-size="32" font-weight="500" fill="#1A1A1A">Anatomy of a pack — PNN-Archive worked out</text>
+    <text x="80" y="88" font-size="15" font-style="italic" fill="#6B6058">What "dial it in" looks like in practice. One pack. Two events in. One read API out. Zero kernel modification.</text>
+
+    <!-- The kernel as a large background container -->
+    <rect x="80" y="115" width="700" height="340" fill="#2A3540" opacity="0.92" stroke="#1A1A1A" stroke-width="1.5"/>
+    <text x="100" y="142" font-size="13" font-weight="600" fill="#F4EFE6" letter-spacing="2" font-family="Helvetica, Arial, sans-serif">KERNEL (untouched)</text>
+
+    <!-- Inside the kernel: a Substrate + Cluster + EventBus visual -->
+    <g font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#F4EFE6">
+      <rect x="120" y="170" width="180" height="60" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+      <text x="210" y="195" text-anchor="middle">Substrate</text>
+      <text x="210" y="215" text-anchor="middle" font-size="11" opacity="0.7" font-style="italic">holds constraints</text>
+
+      <rect x="320" y="170" width="180" height="60" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+      <text x="410" y="195" text-anchor="middle">Cluster</text>
+      <text x="410" y="215" text-anchor="middle" font-size="11" opacity="0.7" font-style="italic">register / remove</text>
+
+      <rect x="520" y="170" width="180" height="60" fill="#1A1A1A" stroke="#A8814C" stroke-width="1"/>
+      <text x="610" y="195" text-anchor="middle">EventBus</text>
+      <text x="610" y="215" text-anchor="middle" font-size="11" opacity="0.7" font-style="italic">emits events</text>
+
+      <!-- arrows showing event emission downward -->
+      <line x1="410" y1="240" x2="410" y2="285" stroke="#A8814C" stroke-width="1.5"/>
+      <polygon points="406,283 414,283 410,295" fill="#A8814C"/>
+      <text x="425" y="275" font-size="11" fill="#F4EFE6" opacity="0.85">emits</text>
+
+      <text x="170" y="320" fill="#F4EFE6" font-size="13">ConstraintRegisteredEvent</text>
+      <text x="170" y="345" fill="#F4EFE6" font-size="13">ConstraintRemovedEvent</text>
+      <text x="170" y="370" fill="#F4EFE6" font-size="11" opacity="0.7" font-style="italic">already exist · the pack just listens</text>
+
+      <!-- small note about no modifications -->
+      <text x="100" y="425" fill="#A8814C" font-size="11" font-style="italic">No kernel file changes. No type shadowing. No new event types added.</text>
+    </g>
+
+    <!-- The pack itself, sitting OUTSIDE the kernel box -->
+    <g>
+      <rect x="830" y="160" width="490" height="295" fill="#B8593A" opacity="0.92" stroke="#7A3A24" stroke-width="1.5"/>
+      <text x="850" y="190" font-size="14" font-weight="600" fill="#F4EFE6" letter-spacing="2" font-family="Helvetica, Arial, sans-serif">PNN-ARCHIVE PACK</text>
+      <text x="850" y="208" font-size="11" fill="#F4EFE6" opacity="0.85" font-family="Helvetica, Arial, sans-serif">~80 LOC · SubstrateExtension plug point</text>
+
+      <!-- subscribes to -->
+      <text x="850" y="245" font-size="12" font-weight="600" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif" letter-spacing="1">SUBSCRIBES TO</text>
+      <text x="850" y="265" font-size="13" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif">  · ConstraintRegisteredEvent  →  snapshot anchor</text>
+      <text x="850" y="283" font-size="13" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif">  · ConstraintRemovedEvent     →  retain "hole"</text>
+
+      <!-- exposes -->
+      <text x="850" y="320" font-size="12" font-weight="600" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif" letter-spacing="1">EXPOSES</text>
+      <text x="850" y="340" font-size="13" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif">  · snapshot()         →  current archive state</text>
+      <text x="850" y="358" font-size="13" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif">  · restore(label)     →  re-instantiate at archived coords</text>
+
+      <!-- config -->
+      <text x="850" y="395" font-size="12" font-weight="600" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif" letter-spacing="1">CONFIG (one dataclass)</text>
+      <text x="850" y="415" font-size="13" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif">  · snapshot_interval: int = 200</text>
+      <text x="850" y="432" font-size="13" fill="#F4EFE6" font-family="Helvetica, Arial, sans-serif">  · restore_strength: float = 0.7</text>
+    </g>
+
+    <!-- Arrows from kernel events into pack -->
+    <g>
+      <path d="M 700 305 Q 770 305, 830 250" fill="none" stroke="#A8814C" stroke-width="1.8"/>
+      <polygon points="826,247 832,254 824,256" fill="#A8814C"/>
+
+      <path d="M 700 330 Q 770 330, 830 280" fill="none" stroke="#A8814C" stroke-width="1.8"/>
+      <polygon points="826,277 832,284 824,286" fill="#A8814C"/>
+    </g>
+
+    <!-- Bottom: how an experiment uses it -->
+    <g>
+      <rect x="80" y="490" width="1240" height="100" fill="#8FA882" opacity="0.6" stroke="#5C7256" stroke-width="1"/>
+      <text x="100" y="518" font-size="13" font-weight="600" fill="#1A1A1A" letter-spacing="2" font-family="Helvetica, Arial, sans-serif">EXPERIMENT MANIFEST · how an experiment dials it in</text>
+
+      <text x="100" y="548" font-family="Menlo, Consolas, monospace" font-size="14" fill="#1A1A1A">experiment = Experiment(kernel="0.4.0", domain="maze")</text>
+      <text x="100" y="568" font-family="Menlo, Consolas, monospace" font-size="14" fill="#1A1A1A">experiment.with_pack(PNNArchive(snapshot_interval=200, restore_strength=0.7))</text>
+      <text x="700" y="558" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#6B6058" font-style="italic">← one line. removable in one line. zero residue elsewhere.</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 4: PROMOTION LADDER                                  -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 2090)">
+    <text x="80" y="20" font-size="14" letter-spacing="3" fill="#A8814C" font-family="Helvetica, Arial, sans-serif">SECTION 4</text>
+    <text x="80" y="56" font-size="28" font-weight="500" fill="#1A1A1A">Promotion ladder</text>
+    <text x="80" y="82" font-size="14" font-style="italic" fill="#6B6058">Direction is upward and slow. Default answer to "should this be promoted?" is no.</text>
+
+    <!-- Four rungs as a horizontal staircase -->
+    <g font-family="Helvetica, Arial, sans-serif">
+      <!-- Prototype -->
+      <rect x="100" y="115" width="280" height="120" fill="#F4EFE6" stroke="#5C7256" stroke-width="1.5"/>
+      <text x="240" y="145" text-anchor="middle" font-size="14" font-weight="600" fill="#1A1A1A" letter-spacing="2">PROTOTYPE</text>
+      <text x="240" y="167" text-anchor="middle" font-size="11" fill="#6B6058">a script in an experiment</text>
+      <text x="240" y="183" text-anchor="middle" font-size="11" fill="#6B6058">that does one thing</text>
+      <text x="120" y="208" font-size="11" fill="#1A1A1A">→ used end-to-end in 1 experiment</text>
+      <text x="120" y="222" font-size="11" fill="#1A1A1A">→ has 1 regression test</text>
+
+      <!-- arrow -->
+      <polygon points="385,175 415,175 415,170 430,177 415,184 415,179 385,179" fill="#A8814C"/>
+
+      <!-- Pack -->
+      <rect x="445" y="115" width="280" height="120" fill="#B8593A" opacity="0.85" stroke="#7A3A24" stroke-width="1.5"/>
+      <text x="585" y="145" text-anchor="middle" font-size="14" font-weight="600" fill="#F4EFE6" letter-spacing="2">PACK</text>
+      <text x="585" y="167" text-anchor="middle" font-size="11" fill="#F4EFE6" opacity="0.9">filed under mpc_packs/</text>
+      <text x="585" y="183" text-anchor="middle" font-size="11" fill="#F4EFE6" opacity="0.9">conforms to a plug point</text>
+      <text x="465" y="208" font-size="11" fill="#F4EFE6">→ 2 experiments depend on it</text>
+      <text x="465" y="222" font-size="11" fill="#F4EFE6">→ stable interface across a session</text>
+
+      <!-- arrow -->
+      <polygon points="730,175 760,175 760,170 775,177 760,184 760,179 730,179" fill="#A8814C"/>
+
+      <!-- Kernel candidate -->
+      <rect x="790" y="115" width="280" height="120" fill="#2A3540" opacity="0.7" stroke="#1A1A1A" stroke-width="1.5"/>
+      <text x="930" y="145" text-anchor="middle" font-size="13" font-weight="600" fill="#F4EFE6" letter-spacing="2">KERNEL CANDIDATE</text>
+      <text x="930" y="167" text-anchor="middle" font-size="11" fill="#F4EFE6" opacity="0.85">marked for review</text>
+      <text x="930" y="183" text-anchor="middle" font-size="11" fill="#F4EFE6" opacity="0.85">in next vision-note</text>
+      <text x="810" y="208" font-size="11" fill="#F4EFE6">→ would be required by hello-world</text>
+      <text x="810" y="222" font-size="11" fill="#F4EFE6">→ removing it forces every pack to grow</text>
+
+      <!-- arrow -->
+      <polygon points="1075,175 1105,175 1105,170 1120,177 1105,184 1105,179 1075,179" fill="#A8814C"/>
+
+      <!-- Kernel -->
+      <rect x="1135" y="115" width="200" height="120" fill="#1A1A1A" stroke="#A8814C" stroke-width="2"/>
+      <text x="1235" y="145" text-anchor="middle" font-size="14" font-weight="600" fill="#A8814C" letter-spacing="2">KERNEL</text>
+      <text x="1235" y="167" text-anchor="middle" font-size="11" fill="#F4EFE6" opacity="0.85">version bumps</text>
+      <text x="1235" y="183" text-anchor="middle" font-size="11" fill="#F4EFE6" opacity="0.85">RFC-style review</text>
+      <text x="1235" y="220" text-anchor="middle" font-size="11" fill="#A8814C" font-style="italic">rare and deliberate</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- FOOTER                                                       -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 2295)">
+    <line x1="80" y1="0" x2="1320" y2="0" stroke="#2A3540" stroke-width="0.8"/>
+    <text x="80" y="25" font-size="12" fill="#6B6058" font-family="Helvetica, Arial, sans-serif">MPC-ANATOMY-001 · Companion to MPC-VISION-001 · April 2026</text>
+    <text x="1320" y="25" font-size="12" fill="#6B6058" font-family="Helvetica, Arial, sans-serif" text-anchor="end" font-style="italic">Print, mark up, hang on a wall. The kernel is the load-bearing element.</text>
+  </g>
+
+</svg>

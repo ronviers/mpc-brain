@@ -1,26 +1,19 @@
-from dataclasses import dataclass
-import numpy as np
-from .phase import Phase
-
-@dataclass
-class PhaseTransitionEvent:
-    from_phase: Phase
-    to_phase: Phase
-    energy: float  
-    position: np.ndarray
-    timestamp: float
-    cluster_id: str
-    constraint_id: str = "engine_global"
-
-@dataclass
-class LandauerEvent:
-    cluster_id: str
-    info_content: float    
-    kT: float = 1.0
-
-@dataclass
-class BudgetResetEvent:
-    cluster_id: str
-    position: np.ndarray
-    timestamp: float
-    info_cost: float = 1.0
+# mpc_kernel/rfc001/events.py
+# Shim for container-side imports. The canonical split lives on the workstation
+# per RFC-002 §6. Session 6 carve-out work replaces this file.
+from mpc_engine_rfc001 import (
+    Phase,
+    PhaseTransitionEvent,
+    LandauerEvent,
+    BudgetResetEvent,
+    EventBus,
+    Calorimeter,
+)
+__all__ = [
+    "Phase",
+    "PhaseTransitionEvent",
+    "LandauerEvent",
+    "BudgetResetEvent",
+    "EventBus",
+    "Calorimeter",
+]
