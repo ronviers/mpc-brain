@@ -38,6 +38,12 @@ from mpc_packs.persistence_substrate.pack import PersistenceCluster, Effector
 from mpc_packs.z3_socket.pack import Z3SymbolicSocket
 from mpc_packs.metareasoner.pack import Metareasoner
 from mpc_packs.symbolic_forebrain.pack import SymbolicForebrain
+from mpc_packs.dynamical_gate import (
+    DynamicalEngine,
+    DynamicalGate,
+    StreamingObservables,
+)
+from mpc_packs.physics_primitives import run_langevin
 
 # ── local experiment modules ─────────────────────────────────────────────────
 from experiments.maze.manifest import EXPERIMENT_CONFIG, check_kernel_version
@@ -65,6 +71,57 @@ E_S = EXPERIMENT_CONFIG["E_s"]
 SEED = EXPERIMENT_CONFIG["seed"]
 
 PLOT_PATH = os.path.join(_HERE, "artifacts", "maze_demo.png")
+
+# Session-8 toggle: swap each cluster engine for a DynamicalEngine so
+# PhaseTransitionEvent.fdr_slope is populated automatically on basin entry.
+# Set to False to run the Session-5 baseline InstrumentedEngine path.
+USE_DYNAMICAL_ENGINE = True
+
+
+# ── dynamical-engine swap (Session 8) ────────────────────────────────────────
+
+def _upgrade_cluster_engines_to_dynamical(cluster, maze) -> None:
+    """Replace each MetastableEngine / InstrumentedEngine in cluster.engines
+    with a DynamicalEngine carrying a DynamicalGate + StreamingObservables
+    pair. Async release keeps measure_fdr off the stepping critical path;
+    the stepping loop runs at full speed, the worker returns asynchronously,
+    and subsequent PhaseTransitionEvents carry the cached fdr_slope.
+
+    Physical setup:
+      - τ-gate observable: total substrate energy (substrate-agnostic).
+      - V_obs for measure_fdr: same.
+      - Bath reference for τ_env: Langevin trajectory on a weak harmonic
+        potential centred at the maze centre. Proxy for free-bath
+        diffusion on this substrate.
+    """
+    center = maze.cell_to_position((maze.width // 2, maze.height // 2), DIM)
+    U_bath = lambda v: 0.05 * np.sum((v - center) ** 2)
+    bath = run_langevin(U_bath, center, 500, rng=np.random.default_rng(7))
+
+    V_obs = cluster.sub.energy  # bound method; closes over the live substrate
+
+    upgraded = []
+    for old in cluster.engines:
+        gate = DynamicalGate(window=300, tau_floor=0.05, recompute_interval=100)
+        obs = StreamingObservables(V_A_fn=V_obs, window=300, bath_trajectory=bath)
+        new_eng = DynamicalEngine(
+            substrate=old.sub,
+            bus=old.bus,
+            gate=gate,
+            observables=obs,
+            V_obs=V_obs,
+            h_mag=0.05,
+            async_release=True,
+            E_star=old.E_star,
+            dt=old.dt,
+            barrier_strength=old.barrier_strength,
+            cluster_id=old.cluster_id,
+        )
+        new_eng.v = old.v.copy()
+        new_eng.attention_scarcity = old.attention_scarcity
+        upgraded.append(new_eng)
+
+    cluster.engines = upgraded
 
 
 # ── wiring ───────────────────────────────────────────────────────────────────
@@ -102,6 +159,9 @@ def build_world() -> Tuple[MazeWorld, Network, EventBus, PersistenceCluster,
     cluster.cluster_id = "main"
     for eng in cluster.engines:
         eng.cluster_id = "main"
+
+    if USE_DYNAMICAL_ENGINE:
+        _upgrade_cluster_engines_to_dynamical(cluster, maze)
 
     network.clusters["main"] = cluster
 
@@ -159,6 +219,12 @@ def run_loop(maze, cluster, effector, mr, forebrain) -> Dict[str, Any]:
                         "new_budget"
                     )
                     action_log.append((step, action.kind, str(tag)))
+
+    # Drain any background FDR worker(s) before returning so the cached
+    # slope is finalised for downstream inspection.
+    for eng in cluster.engines:
+        if hasattr(eng, "wait_for_release"):
+            eng.wait_for_release()
 
     return {
         "signal_trace": signal_trace,
@@ -409,6 +475,33 @@ def main() -> Dict[str, Any]:
     info = result["info"]
     for k, v in info.items():
         print(f"  {k}: {v}")
+
+    # ── Session-8 dynamical-engine state ────────────────────────────────────
+    dynamical_engines = [
+        e for e in cluster.engines if isinstance(e, DynamicalEngine)
+    ]
+    if dynamical_engines:
+        print()
+        print("=" * 72)
+        print("DynamicalEngine state (Session 8)")
+        print("=" * 72)
+        for i, e in enumerate(dynamical_engines):
+            slope = (
+                f"{e.cached_fdr_slope:+.4f}"
+                if e.cached_fdr_slope is not None
+                else "None"
+            )
+            tau = (
+                f"{e.gate.tau_estimate:.4f}"
+                if e.gate.tau_estimate is not None
+                else "None"
+            )
+            print(
+                f"  engine[{i}]  release_count={e.release_count}  "
+                f"cached_fdr_slope={slope}  "
+                f"gate.tau_estimate={tau}  "
+                f"gate.is_pinned={e.gate.is_pinned}"
+            )
 
     return result
 
