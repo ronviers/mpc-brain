@@ -33,63 +33,21 @@ from mpc_packs.observation_socket import ObservationSocket
 
 # ── InstrumentedEngine ──────────────────────────────────────────────────────
 #
-# Carved from mpc_session4 into this pack to break a circular import
-# (session4 re-exports PersistenceCluster from here, which was trying to
-# import InstrumentedEngine from session4). mpc_session4 now re-exports
-# InstrumentedEngine from here instead.
+# RETIRED. Session 9: the kernel MetastableEngine already emits
+# PhaseTransitionEvent with `energy` populated (Session 6 AMEND-005
+# integration), so InstrumentedEngine's only purpose — enriching the
+# event with an energy field — is no longer needed. Kept as an alias
+# of MetastableEngine so name-based imports (`from ... import
+# InstrumentedEngine`) continue to resolve and isinstance checks still
+# pass. New code should use MetastableEngine directly.
+#
+# Semantic note. The retired class emitted post-update energy
+# `sub.energy(v_after_update)`; the kernel emits pre-update energy
+# `state.energy` (evaluated before the step's velocity update). Both
+# are well-defined; they differ by one integration step. Effector
+# cost statistics will shift slightly but deterministically.
 
-
-class InstrumentedEngine(MetastableEngine):
-    """MetastableEngine variant that emits PhaseTransitionEvent with
-    `energy = float(sub.energy(v_post))` populated (AMEND-005,
-    Session 4). RFC-001 §3 invariants are inherited unchanged:
-    classification, budget wall, and maintenance-field behaviour come
-    from the parent; only the event emission is enriched.
-
-    The canonical kernel MetastableEngine already populates `energy`
-    (with the pre-update value). InstrumentedEngine uses the post-update
-    value — subtle but observable to consumers like the Effector. Kept
-    as a distinct class for bit-level backward compatibility with
-    Session-5-era Effector total_cost statistics.
-    """
-
-    def step(self, external_force: Optional[np.ndarray] = None) -> np.ndarray:
-        ext = external_force if external_force is not None else np.zeros(self.sub.dim)
-        state = self.sub._energy_state(self.v)
-        F_cons = -state.gradient
-
-        prev_phase = self.sub.classify(self.v)
-        self._maint.update(self.v, prev_phase)
-        F_maint = (
-            self._maint.force(self.v, self.barrier_strength)
-            if prev_phase == Phase.S
-            else np.zeros(self.sub.dim)
-        )
-
-        std = np.sqrt(2.0 * self.attention_scarcity * self.dt + 1e-12)
-        F_noise = std * np.random.randn(self.sub.dim)
-        v_proposed = self.v + self.dt * (F_cons + F_maint + ext) + F_noise
-
-        if self.sub.energy(v_proposed) > self.E_star:
-            self._trigger_reset(prev_phase)
-            self._t += self.dt
-            return self.v
-
-        self.v = v_proposed
-        new_phase = self.sub.classify(self.v)
-
-        if new_phase != prev_phase:
-            self.bus.emit(PhaseTransitionEvent(
-                from_phase=prev_phase, to_phase=new_phase,
-                position=self.v.copy(), timestamp=self._t,
-                cluster_id=self.cluster_id,
-                energy=float(self.sub.energy(self.v)),
-            ))
-
-        self._phase_hist.append((self._t, new_phase))
-        self._energy_hist.append(state.energy)
-        self._t += self.dt
-        return self.v
+InstrumentedEngine = MetastableEngine
 
 
 # ── PersistenceSubstrate ────────────────────────────────────────────────────
