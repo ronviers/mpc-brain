@@ -30,8 +30,8 @@ EXPERIMENT_CONFIG = {
     "max_engines": 2,
     "n_steps": 1500,
     "plan_interval": 20,
-    "goal_stiffness": 0.05,
-    "neighbour_stiffness": 0.4,
+    "goal_stiffness": 0.3,        # Session 10: swept up from 0.05 for faster traversal
+    "neighbour_stiffness": 0.1,   # Session 10: swept down from 0.4; relative goal/neighbour ratio matters
     # Additional config items from v2 §TASK-5 configuration block.
     "tau_base": 200.0,
     "usage_coef": 1.0,
