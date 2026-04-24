@@ -47,9 +47,36 @@ def _build_maze_rules(
     maze: MazeWorld,
     goal_stiffness: float = 0.05,
     neighbour_stiffness: float = 0.4,
+    m6_cooldown: int = 5,
 ) -> List[Tuple[Callable, Callable]]:
-    """Return the five-rule plan_library for a SymbolicForebrain."""
+    """Return the plan_library for a SymbolicForebrain.
+
+    Rules (priority order): M1 goal_magnet, M2 sync-loaded-cells,
+    M6 drop-farthest-when-idle, M3 expand-2-hop-when-stuck,
+    M4 rebudget-on-thermal-pressure, M5 noop fallback.
+
+    `m6_cooldown` is the number of plan_steps that a cell-label
+    stays unloaded after M6 drops it (Session 10 traversal tuning).
+    Swept {1, 2, 3, 5, 8} over 3000-step runs with deterministic seed;
+    cd=5 gave the best traversal (8 cells visited, agent reached (3,1),
+    nearest-distance-to-goal=7). Too small (1-2) lets M2 re-add before
+    the asymmetric basin moves the engine; too large (8+) wastes time
+    with a stale load-set that doesn't track the agent's actual cell.
+    """
     goal_col, goal_row = maze.goal
+
+    # ── Shared state: M6 drop cooldown ──────────────────────────────────────
+    # Map of cell label -> remaining plan_steps before M2 is allowed to
+    # re-add it. Decremented on every M2-predicate evaluation (which runs
+    # on every plan_step once the goal_magnet is loaded). M6 writes to this
+    # dict; M2 reads it to shrink `desired` by the cooled-down labels.
+    cooldown: dict = {}
+
+    def _decrement_cooldowns():
+        for label in list(cooldown):
+            cooldown[label] -= 1
+            if cooldown[label] <= 0:
+                del cooldown[label]
 
     # ── M1: one-time goal loading ────────────────────────────────────────────
 
@@ -76,10 +103,13 @@ def _build_maze_rules(
         agent_cell = maze.position_to_cell(cluster.engines[0].v)
         desired = {_cell_label(c) for c in maze.neighbours(agent_cell)}
         desired.add(_cell_label(agent_cell))
+        # Respect M6's cooldown: don't re-add recently-dropped cells.
+        desired -= set(cooldown.keys())
         loaded = _loaded_cell_labels(cluster)
         return desired, loaded
 
     def m2_pred(signals, cluster, network) -> bool:
+        _decrement_cooldowns()
         desired, loaded = _desired_loaded(cluster)
         return desired != loaded
 
@@ -158,6 +188,9 @@ def _build_maze_rules(
             return abs(c - gc) + abs(r - gr)
 
         farthest = max(candidates, key=goal_dist)
+        # Hysteresis: keep `farthest` unloaded for m6_cooldown plan_steps.
+        # M2's decrement-every-tick handles cleanup.
+        cooldown[farthest] = m6_cooldown
         return Action(
             kind="remove_proposition",
             cluster_id=cid,
