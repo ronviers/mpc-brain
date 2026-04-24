@@ -36,10 +36,10 @@ negotiable; everything else is.
 │               hello_world · maze · (dynamical)                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                            PACKS                                │
-│   physics_primitives · dynamical_gate · z3_socket               │
-│   metareasoner · symbolic_forebrain                             │
-│   decaying_substrate · persistence_substrate                    │
-│   mobility_detector (shelved)                                   │
+│   physics_primitives · dynamical_gate                           │
+│   jax_substrate · auto_cluster · decaying_substrate             │
+│   effector · z3_socket · metareasoner · symbolic_forebrain      │
+│   persistence_substrate · mobility_detector (shelved)           │
 ├─────────────────────────────────────────────────────────────────┤
 │                           KERNEL                                │
 │  Substrate · Engine · Cluster · Network · EventBus · Phase      │
@@ -117,15 +117,23 @@ mpc-brain/
 │   ├── physics_primitives/            # Langevin + dynamical classifier
 │   ├── dynamical_gate/                # streaming-τ FDR release + DynamicalEngine
 │   ├── mobility_detector/             # shelved linear mobile-vs-pinned probe
-│   ├── decaying_substrate/            # S3 carve-out (transitional shim)
+│   ├── jax_substrate/                 # JAX-accelerated Substrate
+│   ├── auto_cluster/                  # self-organising MPCCluster (RFC-001 §4.3)
+│   ├── decaying_substrate/            # temporal frustration decay (AMEND-001)
+│   ├── effector/                      # commit-accounting subscriber (AMEND-005)
 │   ├── persistence_substrate/         # S4 carve-out (transitional shim)
 │   ├── z3_socket/                     # Z3-backed ObservationSocket
 │   ├── metareasoner/                  # EventSubscriber, per-cluster signals
 │   └── symbolic_forebrain/            # Governor
 │
+├── mpc_engine_rfc001.py               # historical monolith (top-level for legacy imports)
+├── mpc_session2.py                    # ↑ sys.modules alias → experiments/historical/
+├── mpc_session3.py                    # ↑ same
+├── mpc_session4.py                    # ↑ same
+│
 └── experiments/
     ├── hello_world/                   # kernel-only demo (scaffold)
-    ├── maze/                          # Session-5 closed-loop navigation demo
+    ├── maze/                          # maze navigation demo, now runs DynamicalEngine
     └── historical/                    # SESSION-<N>-REPORT.md, legacy scripts
 ```
 
@@ -189,6 +197,13 @@ PACKS = [
 EXPERIMENT_CONFIG = {"maze_w": 7, "maze_h": 7, "dim": 4,
                      "n_steps": 1500, "E_c": 0.5, "E_s": 3.0, ...}
 ```
+
+`experiments/maze/run.py` additionally exposes a `USE_DYNAMICAL_ENGINE`
+toggle (default `True`) that replaces each cluster engine with a
+`DynamicalEngine` carrying its own `DynamicalGate` +
+`StreamingObservables` pair. Async release keeps `measure_fdr` off the
+stepping critical path, so a gate firing during the 1500-step run
+doesn't stall the loop.
 
 `experiments/<name>/run.py` loads the manifest, attaches the packs to a fresh
 kernel, runs the workload, writes trace data and the report. The report
@@ -310,25 +325,34 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
   `LandauerEvent`, and `BudgetResetEvent` (Session 6 carve-out).
   `PhaseTransitionEvent` carries an optional `fdr_slope` field for
   dynamical classification.
-- **Pack carve-out is partial.** First-class packs:
-  `physics_primitives`, `z3_socket`, `metareasoner`,
-  `symbolic_forebrain`, `dynamical_gate`, `mobility_detector`
-  (shelved). Transitional shims re-exporting from the historical
-  monoliths: `decaying_substrate`, `persistence_substrate`.
-  `jax_substrate`, `auto_cluster`, `effector`, and `calorimeter` have
-  not yet been carved out; callers import from the historical
-  monoliths via the shim path.
+- **Kernel event types are unified.** `PhaseTransitionEvent`, `Phase`,
+  `LandauerEvent`, `BudgetResetEvent`, `EventBus`, and `Calorimeter`
+  resolve to the same class object whether imported from
+  `mpc_kernel.rfc001.*`, `mpc_engine_rfc001`, or
+  `experiments.historical.mpc_session4`. Session 4's shadow
+  `PhaseTransitionEvent` dataclass is retired.
+- **Pack carve-out landed for all Session-6 targets.** First-class
+  packs: `physics_primitives`, `dynamical_gate`, `jax_substrate`,
+  `auto_cluster`, `decaying_substrate`, `effector`, `z3_socket`,
+  `metareasoner`, `symbolic_forebrain`, `mobility_detector` (shelved).
+  Remaining transitional shim: `persistence_substrate`. Remaining
+  historical monolith residents planned for Session 9:
+  `LateralCluster`, `ObservationSocket`/`AnthropicSocket`/`ConstraintSpec`,
+  `LLMConstraintEncoder`, `PersistenceCluster`/`PersistenceSubstrate`.
 - **Dynamical track.** `mpc_packs/physics_primitives` provides the
   Langevin observables and the four-regime classifier
   `classify_phase_dynamical(...)`. `mpc_packs/dynamical_gate` layers
   on streaming-τ release gating, paired streaming estimators, and
   `DynamicalEngine` — a `MetastableEngine` subclass that emits
   `PhaseTransitionEvent` with `fdr_slope` populated automatically on
-  transitions that occurred after a gate release. Full Session-A rig
-  reproduces via `python docs/dynamical-track/mpc_lattice.py`.
-- **Latest green experiment:** `experiments/maze/` (Session 5, 1500-step
-  closed-loop navigation demo). `DynamicalEngine` has not yet been
-  wired into an experiment — Session 8 work.
+  transitions that occurred after a gate release. Async release via
+  `async_release=True` keeps `measure_fdr` off the stepping critical
+  path (~23× stepping speedup, slope byte-identical). Full Session-A
+  rig reproduces via `python docs/dynamical-track/mpc_lattice.py`.
+- **Latest green experiment:** `experiments/maze/` now runs
+  `DynamicalEngine` as a drop-in for `InstrumentedEngine` via the
+  `USE_DYNAMICAL_ENGINE = True` toggle. All six TASK-5 acceptance
+  criteria PASS.
 
 ---
 
@@ -343,8 +367,9 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
 | 5 | First RFC-002-native session. Kernel surgery, three new packs (Z3Socket, Metareasoner, SymbolicForebrain), first maze navigation experiment. | complete |
 | 6 | Physics-primitives pack carve-out from `docs/dynamical-track/`; kernel events carved out of the legacy monolith shim; `classify_phase_dynamical` + `PhaseTransitionEvent.fdr_slope` wired end-to-end. | complete |
 | 7 | Streaming-τ `dynamical_gate` pack: edge-triggered FDR release, `StreamingObservables` companion, `DynamicalEngine(MetastableEngine)` drop-in that auto-populates `PhaseTransitionEvent.fdr_slope`. One failed design (Maya mobility gate) shelved as `mobility_detector`. | complete |
-| 8 | Async release worker; remainder of S2/S3/S4 pack carve-out (`jax_substrate`, `auto_cluster`, `effector`, `calorimeter`); `DynamicalEngine` in the maze experiment; Tolman experimental battery. | planned |
-| 9 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
+| 8 | Async release worker. Top-level session-monolith shims + unified event / `Calorimeter` type identity. First-class packs carved: `jax_substrate`, `auto_cluster`, `effector`, `decaying_substrate` (promoted from shim). `DynamicalEngine` in the maze experiment; all six TASK-5 criteria PASS. | complete |
+| 9 | Remaining S3/S4 carve-outs (`LateralCluster`, `ObservationSocket` + `AnthropicSocket` + `ConstraintSpec`, `LLMConstraintEncoder`, `PersistenceCluster` + `PersistenceSubstrate`, retire `InstrumentedEngine`). Tolman experimental battery. Maze determinism / seeding. | planned |
+| 10 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
 | 9+ | Persistence-doc packs land per RFC-002 Appendix A. | queued |
 
 The cleanest stopping condition: if Session 7's behavioural curves
