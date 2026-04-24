@@ -105,17 +105,44 @@ shows the engine doing something.
 
 ## Measured traversal progression
 
-| Config | Steps | Cells | Commits | Final cell | Nearest to goal |
-|---|---|---|---|---|---|
-| Before M6 (S9 baseline) | 1500 | 3 | 0 | (1,1) | 10 |
-| M6 only (cd=0) | 1500 | 4 | 40 | (1,2) | 9 |
-| M6 + cd=3 | 1500 | 5 | 18 | (1,2) | 9 |
-| M6 + cd=5 | 3000 | 8 | 36 | (3,1) | 7 |
-| M6 + cd=5 + gs=0.3, ns=0.1 | 1500 | 10 | 7 | (4,4) | 4 |
-| M6 + cd=5 + gs=0.3, ns=0.1 | 3000 | 15 | 43 | (5,6) | **1** |
+| Config | Steps | Cells | Commits | Final cell | Nearest to goal | Reached @ step |
+|---|---|---|---|---|---|---|
+| Before M6 (S9 baseline) | 1500 | 3 | 0 | (1,1) | 10 | never |
+| M6 only (cd=0) | 1500 | 4 | 40 | (1,2) | 9 | never |
+| M6 + cd=3 | 1500 | 5 | 18 | (1,2) | 9 | never |
+| M6 + cd=5 | 3000 | 8 | 36 | (3,1) | 7 | never |
+| M6 + cd=5 + gs=0.3, ns=0.1 | 1500 | 10 | 7 | (4,4) | 4 | never |
+| M6 + cd=5 + gs=0.3, ns=0.1 | 3000 | 15 | 43 | (5,6) | 1 | never |
+| M6 + cd=5 + gs=0.3, ns=0.1 | **6000** | **20** | **85** | **(6,6)** | **0** | **4242** |
 
 The 7×7 maze has A* path length 27. Session 5 got 3 cells. Session 10
-gets within 1 cell of a full traversal.
+**reaches the goal** (step 4242 of a 6000-step run). First goal-reach
+in the project's history. Session 5's M6 prediction, four sessions
+later, fully realised.
+
+First-reach per Manhattan distance on the 6000-step run:
+
+| Distance to goal | First touched at step |
+|---|---|
+| 12 (start) | 0 |
+| 11 | 82 |
+| 10 | 85 |
+| 9 | 254 |
+| 8 | 409 |
+| 7 | 713 |
+| 6 | 748 |
+| 5 | 905 |
+| 4 | 1188 |
+| 3 | 1584 |
+| 2 | 1786 |
+| 1 | 2497 |
+| **0 (goal)** | **4242** |
+
+Roughly linear progression, ~333 steps per Manhattan-distance
+decrement. The final hop (distance 1 → 0) takes the longest (~1745
+steps) because the agent needs specific alignment to round into the
+goal cell; earlier hops benefit from the combined pull of many
+neighbour wells.
 
 ---
 
