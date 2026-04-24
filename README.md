@@ -36,8 +36,10 @@ negotiable; everything else is.
 │               hello_world · maze · (dynamical)                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                            PACKS                                │
-│   physics_primitives · z3_socket · metareasoner                 │
-│   symbolic_forebrain · decaying_substrate · persistence_…       │
+│   physics_primitives · dynamical_gate · z3_socket               │
+│   metareasoner · symbolic_forebrain                             │
+│   decaying_substrate · persistence_substrate                    │
+│   mobility_detector (shelved)                                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                           KERNEL                                │
 │  Substrate · Engine · Cluster · Network · EventBus · Phase      │
@@ -113,6 +115,8 @@ mpc-brain/
 │
 ├── mpc_packs/                         # capability modules
 │   ├── physics_primitives/            # Langevin + dynamical classifier
+│   ├── dynamical_gate/                # streaming-τ FDR release + DynamicalEngine
+│   ├── mobility_detector/             # shelved linear mobile-vs-pinned probe
 │   ├── decaying_substrate/            # S3 carve-out (transitional shim)
 │   ├── persistence_substrate/         # S4 carve-out (transitional shim)
 │   ├── z3_socket/                     # Z3-backed ObservationSocket
@@ -306,22 +310,25 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
   `LandauerEvent`, and `BudgetResetEvent` (Session 6 carve-out).
   `PhaseTransitionEvent` carries an optional `fdr_slope` field for
   dynamical classification.
-- **Pack carve-out is partial.** `physics_primitives`, `z3_socket`,
-  `metareasoner`, and `symbolic_forebrain` are first-class packs.
-  `decaying_substrate` and `persistence_substrate` are transitional
-  shims re-exporting from the historical monoliths in
-  `experiments/historical/` (`mpc_session3.py`, `mpc_session4.py`).
+- **Pack carve-out is partial.** First-class packs:
+  `physics_primitives`, `z3_socket`, `metareasoner`,
+  `symbolic_forebrain`, `dynamical_gate`, `mobility_detector`
+  (shelved). Transitional shims re-exporting from the historical
+  monoliths: `decaying_substrate`, `persistence_substrate`.
   `jax_substrate`, `auto_cluster`, `effector`, and `calorimeter` have
   not yet been carved out; callers import from the historical
   monoliths via the shim path.
 - **Dynamical track.** `mpc_packs/physics_primitives` provides the
-  Langevin observables (`run_langevin`, `correlation_time`,
-  `survival_margin`, `cross_dissipation`, `measure_fdr`) and the
-  four-regime classifier `classify_phase_dynamical(...)`. Validated
-  against the Session-A four-scenario table; full rig reproduces via
-  `python docs/dynamical-track/mpc_lattice.py`.
+  Langevin observables and the four-regime classifier
+  `classify_phase_dynamical(...)`. `mpc_packs/dynamical_gate` layers
+  on streaming-τ release gating, paired streaming estimators, and
+  `DynamicalEngine` — a `MetastableEngine` subclass that emits
+  `PhaseTransitionEvent` with `fdr_slope` populated automatically on
+  transitions that occurred after a gate release. Full Session-A rig
+  reproduces via `python docs/dynamical-track/mpc_lattice.py`.
 - **Latest green experiment:** `experiments/maze/` (Session 5, 1500-step
-  closed-loop navigation demo).
+  closed-loop navigation demo). `DynamicalEngine` has not yet been
+  wired into an experiment — Session 8 work.
 
 ---
 
@@ -335,8 +342,9 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
 | 4 | Effector (total-cost accounting), PersistenceSubstrate, network demo | complete |
 | 5 | First RFC-002-native session. Kernel surgery, three new packs (Z3Socket, Metareasoner, SymbolicForebrain), first maze navigation experiment. | complete |
 | 6 | Physics-primitives pack carve-out from `docs/dynamical-track/`; kernel events carved out of the legacy monolith shim; `classify_phase_dynamical` + `PhaseTransitionEvent.fdr_slope` wired end-to-end. | complete |
-| 7 | Online FDR estimator; remainder of S2/S3/S4 pack carve-out (`jax_substrate`, `auto_cluster`, `effector`, `calorimeter`); Tolman experimental battery. | planned |
-| 8 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
+| 7 | Streaming-τ `dynamical_gate` pack: edge-triggered FDR release, `StreamingObservables` companion, `DynamicalEngine(MetastableEngine)` drop-in that auto-populates `PhaseTransitionEvent.fdr_slope`. One failed design (Maya mobility gate) shelved as `mobility_detector`. | complete |
+| 8 | Async release worker; remainder of S2/S3/S4 pack carve-out (`jax_substrate`, `auto_cluster`, `effector`, `calorimeter`); `DynamicalEngine` in the maze experiment; Tolman experimental battery. | planned |
+| 9 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
 | 9+ | Persistence-doc packs land per RFC-002 Appendix A. | queued |
 
 The cleanest stopping condition: if Session 7's behavioural curves
