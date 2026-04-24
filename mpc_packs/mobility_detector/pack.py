@@ -1,9 +1,11 @@
-"""dynamical_gate — linear gate that decides when to release an FDR
-measurement ahead of the engine.
+"""mobility_detector — linear mobile-vs-pinned classifier.
 
-Scaffold. Signatures and docstrings locked; bodies to be filled in
-Session 7 step 1. See README.md for the design rationale and the
-acceptance-test shape.
+Measures whether an engine is actively exploring (noise dominates drift,
+per-window displacement direction uncorrelated with gradient) or settled
+(per-window displacement sub-thermal, signal suppressed). Originally
+scoped as the FDR-release gate; retained as a mobility observable after
+the four-scenario calibration showed its semantics are orthogonal to the
+FDR-release need. See README "Why it's shelved" for the full context.
 """
 
 from __future__ import annotations
@@ -80,20 +82,19 @@ def gate_signal(
 # ── Orchestrator ────────────────────────────────────────────────────────────
 
 
-class DynamicalGate:
+class MobilityDetector:
     """Per-engine companion that maintains a rolling trajectory buffer
-    and exposes the gate state.
+    and exposes a mobility signature.
 
     Usage from an experiment's run loop:
 
-        gate = DynamicalGate(dim=sub.dim, window=50, threshold=0.3)
+        det = MobilityDetector(dim=sub.dim, window=50, threshold=0.3)
         for _ in range(n_steps):
             v = engine.step()
-            gate.observe(v, grad_fn=sub.gradient, gamma=gamma, dt=dt)
-            if gate.should_release():
-                # Expensive path: measure_fdr at predicted landing, or
-                # use the precomputed classification from a prior release.
-                ...
+            det.observe(v, grad_fn=sub.gradient, gamma=gamma, dt=dt)
+            # Continuous observables:
+            mobile_score = det.tension          # in [0, ∞), 0 when settled
+            mobile_event = det.should_release() # discrete boolean
     """
 
     def __init__(
@@ -112,6 +113,7 @@ class DynamicalGate:
         self._trip_count: int = 0
         self._last_trip_step: Optional[int] = None
         self._tripped: bool = False
+        self._tension: float = 0.0
 
     def observe(
         self,
@@ -136,6 +138,17 @@ class DynamicalGate:
         # Normalise the tail to a per-step displacement so it compares to
         # the per-step ghost on the same time scale.
         tail_per_step = (v_cur - v_past) / self.window
+
+        # Continuous tension signal — unit-free. High when ghost and tail
+        # disagree and both have appreciable magnitude; zero otherwise.
+        ng = float(np.linalg.norm(ghost_delta))
+        nt = float(np.linalg.norm(tail_per_step))
+        if ng > 1e-12 and nt > 1e-12:
+            cos_sim = float(np.dot(ghost_delta, tail_per_step) / (ng * nt))
+            self._tension = (1.0 - cos_sim) * min(ng, nt)
+        else:
+            self._tension = 0.0
+
         if gate_signal(ghost_delta, tail_per_step, self.threshold, self.min_tail_mag):
             self._tripped = True
             self._trip_count += 1
@@ -154,3 +167,12 @@ class DynamicalGate:
     def last_trip_step(self) -> Optional[int]:
         """Step index of the most recent trip, or None if never tripped."""
         return self._last_trip_step
+
+    @property
+    def tension(self) -> float:
+        """Continuous mobility signal (unit-free). High when the linear
+        drift and recent trajectory disagree in direction AND both have
+        appreciable magnitude; zero when motion is sub-thermal or purely
+        drift-aligned. Consumers may integrate, threshold, or use as a
+        feature. Updated every `observe()` call."""
+        return self._tension

@@ -1,13 +1,13 @@
-"""dynamical_gate pack — sanity + acceptance tests.
+"""mobility_detector pack — sanity + calibration tests.
 
 Runs in well under a second for the primitive checks. The full
-four-scenario calibration test regenerates short Langevin trajectories
-and will take a few seconds; skip it during fast CI by setting
-`DYNAMICAL_GATE_SKIP_SCENARIOS=1` in the environment.
+four-scenario calibration regenerates short Langevin trajectories
+and takes ~6-10 s; skip it during fast CI by setting
+`MOBILITY_DETECTOR_SKIP_SCENARIOS=1` in the environment.
 
 Invocation:
 
-    python -m mpc_packs.dynamical_gate.test_pack
+    python -m mpc_packs.mobility_detector.test_pack
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from collections import deque
 
 import numpy as np
 
-from mpc_packs.dynamical_gate.config import DynamicalGateConfig
-from mpc_packs.dynamical_gate.pack import (
-    DynamicalGate,
+from mpc_packs.mobility_detector.config import MobilityDetectorConfig
+from mpc_packs.mobility_detector.pack import (
+    MobilityDetector,
     compute_ghost,
     compute_tail,
     gate_signal,
@@ -43,7 +43,6 @@ def test_compute_tail_straight_line():
         buf.append(np.array([float(i), 0.0]))
     tail = compute_tail(buf, window=10)
     assert np.allclose(tail, np.array([9.0, 0.0])), f"tail: {tail}"
-    # Early-return cases
     assert compute_tail(deque(), 10) is None
     assert compute_tail(deque([np.zeros(2)]), 10) is None
     return tail
@@ -53,38 +52,33 @@ def test_gate_signal_directions():
     """Aligned → no trip; orthogonal or anti-aligned → trip at threshold 0.3."""
     a = np.array([1.0, 0.0])
     assert gate_signal(a, np.array([1.0, 0.0]), 0.3) is False
-    assert gate_signal(a, np.array([0.0, 1.0]), 0.3) is True     # orthogonal
-    assert gate_signal(a, np.array([-1.0, 0.0]), 0.3) is True    # anti-aligned
-    assert gate_signal(np.zeros(2), a, 0.3) is False             # zero-mag
+    assert gate_signal(a, np.array([0.0, 1.0]), 0.3) is True
+    assert gate_signal(a, np.array([-1.0, 0.0]), 0.3) is True
+    assert gate_signal(np.zeros(2), a, 0.3) is False
 
 
-def test_gate_warmup_and_trip():
+def test_detector_warmup_and_trip():
     """Smooth descent toward a harmonic minimum: no trips once the window
     fills. Abrupt direction reversal: one trip immediately after."""
-    grad = lambda v: v.copy()                           # U = |v|^2 / 2
-    gate = DynamicalGate(dim=2, window=10, threshold=0.3)
+    grad = lambda v: v.copy()
+    det = MobilityDetector(dim=2, window=10, threshold=0.3)
 
-    # Warm-up phase: first 9 observations buffer only, no gate signal.
     v = np.array([1.0, 0.0])
     for _ in range(9):
-        gate.observe(v, grad, gamma=1.0, dt=0.01)
-        v = v - v * 0.01                                # deterministic drift
-    assert gate.trip_count == 0, "no trips during warm-up"
-
-    # 10th observation + more smooth descent: ghost and tail both point
-    # toward origin → aligned → no trips.
-    for _ in range(20):
-        gate.observe(v, grad, gamma=1.0, dt=0.01)
+        det.observe(v, grad, gamma=1.0, dt=0.01)
         v = v - v * 0.01
-    assert gate.trip_count == 0, f"smooth descent tripped: {gate.trip_count}"
+    assert det.trip_count == 0, "no trips during warm-up"
 
-    # Flip direction sharply: now the tail says "leftward", ghost still
-    # says "rightward toward origin" (v is positive-x). Anti-alignment
-    # → trip.
+    for _ in range(20):
+        det.observe(v, grad, gamma=1.0, dt=0.01)
+        v = v - v * 0.01
+    assert det.trip_count == 0, f"smooth descent tripped: {det.trip_count}"
+
     v_flip = np.array([-1.0, 0.0])
-    gate.observe(v_flip, grad, gamma=1.0, dt=0.01)
-    assert gate.should_release(), "direction flip should trip"
-    assert gate.trip_count == 1
+    det.observe(v_flip, grad, gamma=1.0, dt=0.01)
+    assert det.should_release(), "direction flip should trip"
+    assert det.trip_count == 1
+    assert det.tension > 0, "tension should be positive on a trip"
 
 
 # ── Four-scenario calibration (Session-A Langevin substrate) ────────────────
@@ -112,17 +106,17 @@ _SCENARIOS = {
 
 
 def run_scenario_calibration(n_steps: int = 3000, gamma: float = 1.0):
-    """Run DynamicalGate over each of the four Session-A scenarios with
+    """Run MobilityDetector over each of the four Session-A scenarios with
     calibrated-default settings; return trip counts per scenario.
 
     Deterministic: same seed across scenarios (2026), same trajectory
-    length. Takes ~6-10 s on CPU (four Langevin runs at 3000 steps each).
+    length. Takes ~6-10 s on CPU.
     """
-    cfg = DynamicalGateConfig()
+    cfg = MobilityDetectorConfig()
     results: dict[str, int] = {}
     for name, (U, v0) in _SCENARIOS.items():
         traj = run_langevin(U, v0, n_steps, rng=np.random.default_rng(2026))
-        gate = DynamicalGate(
+        det = MobilityDetector(
             dim=2,
             window=cfg.window,
             threshold=cfg.threshold,
@@ -130,29 +124,20 @@ def run_scenario_calibration(n_steps: int = 3000, gamma: float = 1.0):
         )
         grad = lambda v: numerical_grad(U, v)
         for v in traj:
-            gate.observe(v, grad, gamma=gamma, dt=DT)
-        results[name] = gate.trip_count
+            det.observe(v, grad, gamma=gamma, dt=DT)
+        results[name] = det.trip_count
     return results
 
 
 def test_scenarios_discriminate():
-    """Weak acceptance: the gate produces a spread of trip counts across
-    the four canonical scenarios. Exact ordering is recorded in README
-    "Calibration findings" and is not asserted here, because the
-    current formulation is known to be silent on the pinned regimes
-    (committed, conflict) where FDR is most needed — fixing that is
-    the next open item.
-
-    Asserted invariants:
-      - not all scenarios produce zero trips (the gate has signal)
-      - not all scenarios saturate (the gate discriminates)
-      - reset trips more than committed (mobile vs pinned)
-    """
+    """Calibration: the detector produces a spread of trip counts across
+    the four canonical scenarios, with mobile regimes firing more than
+    pinned ones."""
     trips = run_scenario_calibration()
     max_t = max(trips.values())
     min_t = min(trips.values())
-    assert max_t > 0, f"gate silent across all scenarios: {trips}"
-    assert max_t - min_t >= 3, f"gate does not discriminate: {trips}"
+    assert max_t > 0, f"detector silent across all scenarios: {trips}"
+    assert max_t - min_t >= 3, f"detector does not discriminate: {trips}"
     assert trips["reset"] > trips["committed"], (
         f"expected reset > committed (mobile > pinned), got {trips}"
     )
@@ -160,7 +145,7 @@ def test_scenarios_discriminate():
 
 
 if __name__ == "__main__":
-    print("dynamical_gate pack — sanity tests")
+    print("mobility_detector pack — sanity tests")
     print("=" * 62)
 
     gh = test_compute_ghost_harmonic()
@@ -172,11 +157,11 @@ if __name__ == "__main__":
     test_gate_signal_directions()
     print(f"[3] gate_signal direction     aligned/orthogonal/anti   OK")
 
-    test_gate_warmup_and_trip()
-    print(f"[4] DynamicalGate warmup+trip smooth descent quiet, flip trips   OK")
+    test_detector_warmup_and_trip()
+    print(f"[4] detector warmup+trip      smooth descent quiet, flip trips   OK")
 
-    if os.environ.get("DYNAMICAL_GATE_SKIP_SCENARIOS") == "1":
-        print("\n[scenarios skipped via DYNAMICAL_GATE_SKIP_SCENARIOS=1]")
+    if os.environ.get("MOBILITY_DETECTOR_SKIP_SCENARIOS") == "1":
+        print("\n[scenarios skipped via MOBILITY_DETECTOR_SKIP_SCENARIOS=1]")
     else:
         trips = test_scenarios_discriminate()
         print(f"[5] four-scenario calibration trips = {trips}   OK")

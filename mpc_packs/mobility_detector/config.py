@@ -1,8 +1,8 @@
-"""dynamical_gate configuration — calibrated for the Markovian Langevin
-substrate used in Session A (docs/dynamical-track/). Substrate-specific.
+"""mobility_detector configuration — calibrated for the Markovian
+Langevin substrate used in Session A. Substrate-specific.
 
-See the "Calibration findings" section of README.md for the empirical trip
-counts across the four canonical scenarios at these settings.
+See the "Calibration findings" section of README.md for the empirical
+trip counts across the four canonical scenarios at these settings.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ THERMAL_STEP: float = float(np.sqrt(2.0 * D_EFF * DT))
 
 
 @dataclass
-class DynamicalGateConfig:
+class MobilityDetectorConfig:
     """Calibrated defaults for the Markovian Langevin substrate."""
 
     window: int = 50
