@@ -34,6 +34,25 @@ from .pack import DynamicalGate
 from .release import release_and_classify
 
 
+def _freeze_energy(substrate) -> Callable[[np.ndarray], float]:
+    """Snapshot the substrate's constraint set into a closure so an async
+    FDR worker does not iterate a mutable dict while the main thread
+    registers / deregisters constraints (M2 / M6 forebrain rules, etc.).
+
+    Returns a pure `energy(v)` function that never touches
+    `substrate._constraints` after this call returns.
+    """
+    snapshot = [
+        (fn, float(h.stiffness))
+        for fn, h in list(substrate._constraints.values())
+    ]
+    if not snapshot:
+        return lambda v: 0.0
+    def frozen_energy(v):
+        return sum(lam * fn(v) for fn, lam in snapshot)
+    return frozen_energy
+
+
 class DynamicalEngine(MetastableEngine):
     """MetastableEngine variant that populates
     `PhaseTransitionEvent.fdr_slope` via a DynamicalGate +
@@ -201,9 +220,20 @@ class DynamicalEngine(MetastableEngine):
                 self._release_count += 1
             else:
                 # Snapshot observables so the worker sees frozen values.
+                # The substrate's constraint dict may mutate during the
+                # ~8 s measure_fdr run (M2 / M6 rules register and
+                # deregister propositions), so we freeze `energy` into a
+                # closure over a snapshot of the constraint list. If
+                # V_obs is a bound method of the live substrate we
+                # snapshot that too; otherwise we trust the caller's
+                # V_obs is stateless.
+                frozen_U = _freeze_energy(self.sub)
+                V_obs_for_worker = self.V_obs
+                if getattr(self.V_obs, "__self__", None) is self.sub:
+                    V_obs_for_worker = frozen_U
                 self._pending = self._executor.submit(
                     release_and_classify,
-                    self.v.copy(), self.sub.energy, self.V_obs,
+                    self.v.copy(), frozen_U, V_obs_for_worker,
                     tau_A=self.observables.tau_A(),
                     tau_env=self.observables.tau_env,
                     gamma_A=self.observables.gamma_A(),
