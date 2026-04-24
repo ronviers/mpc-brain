@@ -96,6 +96,38 @@ Observables exposed:
   `None` before the buffer fills.
 - `trip_count`, `last_trip_step` — cumulative edge-fire bookkeeping.
 
+## Streaming observables (`observables.py`)
+
+`classify_phase_dynamical` takes `tau_A`, `tau_env`, `gamma_A`, and
+optionally `gamma_ij` alongside `fdr_slope`. `StreamingObservables`
+consolidates the rolling-buffer + `correlation_time` /
+`survival_margin` / `cross_dissipation` logic so the caller doesn't
+hand-roll it:
+
+```python
+from mpc_packs.dynamical_gate import StreamingObservables
+
+bath_traj = run_langevin(U_bath, v0_bath, n, rng=...)
+obs = StreamingObservables(V_A_fn=V_A, window=500,
+                          bath_trajectory=bath_traj)
+
+for v in trajectory:
+    gate.observe(v, U)
+    obs.observe(v)
+    if gate.should_release():
+        release = release_and_classify(
+            v, U, V_obs=V_A,
+            tau_A=obs.tau_A(),
+            tau_env=obs.tau_env,
+            gamma_A=obs.gamma_A(),
+            gamma_ij=obs.gamma_ij(),   # None if V_B_fn was not supplied
+        )
+```
+
+`tau_env` is computed once from a separately-supplied bath trajectory
+(it cannot be derived from the engine's own path — bath dynamics live
+in a different substrate by definition).
+
 ## Release chain (`release.py`)
 
 Thin helpers that run the expensive path on a trip:
@@ -158,7 +190,7 @@ The end-to-end test is asserted, not just demonstrated:
    streaming τ buffer. Per-proposition violations V_A or PCA-projected
    coordinates may give cleaner signal in multi-proposition
    experiments.
-2. **Streaming γ_A, γ_ij, tau_A.** `release_and_classify` currently
-   requires the caller to supply streaming-estimator values for these.
-   A companion class that maintains them alongside the gate's τ_E
-   estimator would make integration a single-object attach.
+2. **Engine integration.** A Governor-style pack that attaches a
+   `DynamicalGate` + `StreamingObservables` pair to each engine and
+   populates outgoing `PhaseTransitionEvent.fdr_slope` at release time
+   is the remaining wiring step. The primitives are all in place.

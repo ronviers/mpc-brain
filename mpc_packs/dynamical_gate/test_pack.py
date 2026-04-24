@@ -17,14 +17,10 @@ import numpy as np
 from mpc_kernel.rfc001.events import PhaseTransitionEvent
 from mpc_kernel.rfc001.phase import Phase
 from mpc_packs.dynamical_gate.config import DynamicalGateConfig
+from mpc_packs.dynamical_gate.observables import StreamingObservables
 from mpc_packs.dynamical_gate.pack import DynamicalGate
 from mpc_packs.dynamical_gate.release import release_and_classify
-from mpc_packs.physics_primitives import (
-    DT,
-    correlation_time,
-    run_langevin,
-    survival_margin,
-)
+from mpc_packs.physics_primitives import DT, run_langevin
 
 
 def test_warmup_and_constant_energy():
@@ -182,31 +178,31 @@ def test_end_to_end_committed_wire():
     V_A = lambda v: _V_dist(v, _A, 1.2, 1.0)
     h_mag = 0.05
 
-    # 1. Run the gate on the committed trajectory until first trip.
-    traj = run_langevin(U, v0, 1500, rng=np.random.default_rng(2026))
+    # 1. Pre-compute a bath trajectory for tau_env once.
+    U_bath = lambda v: 0.15 * np.sum((v - _MID) ** 2)
+    bath = run_langevin(U_bath, _MID, 1500, rng=np.random.default_rng(42))
+
+    # 2. Attach gate + streaming observables with bath reference.
     gate = DynamicalGate(window=500, tau_floor=0.05, recompute_interval=100)
+    obs = StreamingObservables(V_A_fn=V_A, window=500, bath_trajectory=bath)
+
+    # 3. Run the committed trajectory. Stop at the first gate trip.
+    traj = run_langevin(U, v0, 1500, rng=np.random.default_rng(2026))
     first_trip_step = None
     for i, v in enumerate(traj):
         gate.observe(v, U)
+        obs.observe(v)
         if gate.should_release() and first_trip_step is None:
             first_trip_step = i
             break
     assert first_trip_step is not None, "committed scenario should trip"
-
-    # 2. Compute streaming observables on what the gate has seen so far.
     v_at_trip = traj[first_trip_step]
-    past = traj[:first_trip_step]
-    U_bath = lambda v: 0.15 * np.sum((v - _MID) ** 2)
-    bath = run_langevin(U_bath, _MID, first_trip_step,
-                        rng=np.random.default_rng(42))
-    tau_A = correlation_time(V_A, past)
-    tau_env = correlation_time(V_A, bath)
-    gamma_A, _, _ = survival_margin(V_A, past, bath)
 
-    # 3. Release FDR at the trip position.
+    # 4. Release FDR using the streaming estimators — no manual
+    # correlation_time / survival_margin at the call site.
     release = release_and_classify(
         v_at_trip, U, V_A,
-        tau_A=tau_A, tau_env=tau_env, gamma_A=gamma_A,
+        tau_A=obs.tau_A(), tau_env=obs.tau_env, gamma_A=obs.gamma_A(),
         h_mag=h_mag,
     )
     assert release.phase == Phase.C, (
@@ -219,7 +215,7 @@ def test_end_to_end_committed_wire():
         f"got {release.fdr_slope:+.3f}"
     )
 
-    # 4. Populate PhaseTransitionEvent.fdr_slope.
+    # 5. Populate PhaseTransitionEvent.fdr_slope.
     evt = PhaseTransitionEvent(
         from_phase=Phase.S, to_phase=release.phase,
         position=v_at_trip.copy(),
