@@ -30,18 +30,21 @@ def compute_ghost(
 
     O(d). Uses the gradient the engine already computed for its own step.
     """
-    raise NotImplementedError("Session 7 step 1: implement compute_ghost.")
+    v = np.asarray(v, dtype=float)
+    return v - (grad_fn(v) / gamma) * dt
 
 
-def compute_tail(buffer: Deque[np.ndarray], window: int) -> np.ndarray:
-    """Direction vector summarising the last `window` positions in
-    `buffer`. Simplest-adequate form: mean-velocity vector
-    `(v[t] − v[t−w]) / w`. Callers may substitute a rolling linear fit.
+def compute_tail(buffer: Deque[np.ndarray], window: int) -> Optional[np.ndarray]:
+    """Displacement vector summarising the last `window` positions in
+    `buffer`: `v[t] − v[t−w]` where `w = min(window, len(buffer) − 1)`.
 
-    Returns a vector aligned with the tail; caller compares to the
-    forward ghost.
+    Direction-only signal for the gate; magnitude is informational. Returns
+    `None` if fewer than two positions are available.
     """
-    raise NotImplementedError("Session 7 step 1: implement compute_tail.")
+    if len(buffer) < 2:
+        return None
+    w = min(window, len(buffer) - 1)
+    return np.asarray(buffer[-1], dtype=float) - np.asarray(buffer[-1 - w], dtype=float)
 
 
 def gate_signal(
@@ -49,13 +52,19 @@ def gate_signal(
     v_tail_delta: np.ndarray,
     threshold: float,
 ) -> bool:
-    """Trip when the linear-ghost and trajectory-tail disagree.
+    """Trip when the linear-ghost and trajectory-tail disagree in direction.
 
-    Both arguments are displacement vectors (ghost − v and tail − v_past).
-    Returns True when the normalised discrepancy exceeds threshold —
-    cosine-distance or L2 on unit vectors, calibrated per substrate.
+    Both arguments are displacement vectors (ghost − v and tail). The signal
+    is the cosine distance `1 − cos(θ)`: 0 when perfectly aligned, 1 when
+    orthogonal, 2 when anti-aligned. Returns True when the distance exceeds
+    `threshold`. Zero-magnitude inputs return False (no information).
     """
-    raise NotImplementedError("Session 7 step 1: implement gate_signal.")
+    ng = float(np.linalg.norm(v_ghost_delta))
+    nt = float(np.linalg.norm(v_tail_delta))
+    if ng < 1e-12 or nt < 1e-12:
+        return False
+    cos_sim = float(np.dot(v_ghost_delta, v_tail_delta) / (ng * nt))
+    return (1.0 - cos_sim) > threshold
 
 
 # ── Orchestrator ────────────────────────────────────────────────────────────

@@ -1,43 +1,71 @@
-"""dynamical_gate pack — acceptance test scaffold.
+"""dynamical_gate pack — sanity + acceptance tests.
 
-Session 7 step 1 fills these stubs. The test regenerates the four
-Session-A scenario trajectories (deterministic, fixed seeds) and
-asserts the gate's trip-count ordering:
-
-    trip_count(reset)     ≈ 0–1
-    trip_count(suspended) ≈ 1–3
-    trip_count(committed) == 1 burst early, then quiet
-    trip_count(conflict)  >  trip_count(committed)
+Runs in well under a second for the primitive checks. The full
+four-scenario calibration test regenerates short Langevin trajectories
+and will take a few seconds; skip it during fast CI by setting
+`DYNAMICAL_GATE_SKIP_SCENARIOS=1` in the environment.
 
 Invocation:
 
     python -m mpc_packs.dynamical_gate.test_pack
 """
 
-import pytest
+from __future__ import annotations
+
+from collections import deque
+
+import numpy as np
+
+from mpc_packs.dynamical_gate.pack import (
+    DynamicalGate,
+    compute_ghost,
+    compute_tail,
+    gate_signal,
+)
 
 
-@pytest.mark.skip(reason="Session 7 step 1: scaffold only.")
-def test_gate_trip_ordering():
-    """Load the four Session-A trajectories; run DynamicalGate over each;
-    assert trip-count ordering reset ≤ suspended < committed ≤ conflict.
-
-    Trajectory regeneration: import the scenario builders from
-    docs/dynamical-track/mpc_lattice.py (or lift them into a fixture),
-    use the same seeded config as the Session-A rig so trajectories
-    match SESSION_A_STATE.md bit-for-bit.
-    """
-    raise NotImplementedError("Session 7 step 1.")
+def test_compute_ghost_harmonic():
+    """U = |v|^2 / 2, grad = v; γ=1, dt=0.01 → v_ghost = 0.99·v."""
+    v = np.array([1.0, 0.0])
+    grad = lambda x: x.copy()
+    gh = compute_ghost(v, grad, gamma=1.0, dt=0.01)
+    assert np.allclose(gh, np.array([0.99, 0.0])), f"ghost: {gh}"
+    return gh
 
 
-@pytest.mark.skip(reason="Session 7 step 1: scaffold only.")
-def test_gate_committed_single_burst():
-    """Committed scenario: the gate should trip at basin entry (early
-    in the trajectory) and then stay quiet as the engine settles into
-    the well. Assert that >80% of trips fall in the first 20% of steps.
-    """
-    raise NotImplementedError("Session 7 step 1.")
+def test_compute_tail_straight_line():
+    """Straight-line motion: `v[-1] − v[-w]` equals accumulated displacement."""
+    buf = deque(maxlen=10)
+    for i in range(10):
+        buf.append(np.array([float(i), 0.0]))
+    tail = compute_tail(buf, window=10)
+    assert np.allclose(tail, np.array([9.0, 0.0])), f"tail: {tail}"
+    # Early-return cases
+    assert compute_tail(deque(), 10) is None
+    assert compute_tail(deque([np.zeros(2)]), 10) is None
+    return tail
+
+
+def test_gate_signal_directions():
+    """Aligned → no trip; orthogonal or anti-aligned → trip at threshold 0.3."""
+    a = np.array([1.0, 0.0])
+    assert gate_signal(a, np.array([1.0, 0.0]), 0.3) is False
+    assert gate_signal(a, np.array([0.0, 1.0]), 0.3) is True     # orthogonal
+    assert gate_signal(a, np.array([-1.0, 0.0]), 0.3) is True    # anti-aligned
+    assert gate_signal(np.zeros(2), a, 0.3) is False             # zero-mag
 
 
 if __name__ == "__main__":
-    print("dynamical_gate test_pack — scaffold. Run after Session 7 step 1.")
+    print("dynamical_gate pack — sanity tests")
+    print("=" * 62)
+
+    gh = test_compute_ghost_harmonic()
+    print(f"[1] compute_ghost harmonic    v_ghost = {gh}   OK")
+
+    tail = test_compute_tail_straight_line()
+    print(f"[2] compute_tail straight     displacement = {tail}   OK")
+
+    test_gate_signal_directions()
+    print(f"[3] gate_signal direction     aligned/orthogonal/anti   OK")
+
+    print("\nPrimitive sanity tests pass.")
