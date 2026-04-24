@@ -80,97 +80,12 @@ def _make_quadratic_constraint(center: np.ndarray) -> Callable:
 
 # ================================================================================
 #  TASK 1 - JAX-enhanced Substrate  (RFC-001 S4.1, no API change)
+#
+#  Canonical definition now lives in mpc_packs.jax_substrate (carved
+#  Session 8). Re-exported here so Session-2-era callers keep working.
 # ================================================================================
 
-class JAXSubstrate(Substrate):
-    """
-    RFC-001 S4.1-conforming Substrate using JAX exact derivatives.
-
-    Overrides gradient() and hessian() to use jax.grad / jax.hessian.
-    All other methods are unchanged from the base class.
-
-    Fallback: if JAX is unavailable or tracing fails, _jax_ok is set False
-    and finite-difference code runs transparently from that point on.
-
-    Version protocol: register / deregister / update_lambda each increment
-    _constraint_version. _ensure_compiled() recompiles when version advances,
-    baking current stiffness values into the XLA computation.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._jax_ok             = _JAX
-        self._constraint_version = 0
-        self._compiled_version   = -1
-        self._jax_grad_fn        = None
-        self._jax_hess_fn        = None
-
-    # RFC-001 S4.1 interface - unchanged signatures
-
-    def register(self, proposition_id, fn, lam=1.0):
-        h = super().register(proposition_id, fn, lam)
-        self._constraint_version += 1
-        return h
-
-    def deregister(self, handle):
-        super().deregister(handle)
-        self._constraint_version += 1
-
-    def update_lambda(self, handle, lam):
-        # Stiffness is baked into XLA at compile time -> must recompile.
-        super().update_lambda(handle, lam)
-        self._constraint_version += 1
-
-    def gradient(self, v):
-        """Exact gradient via jax.grad; falls back to FD on any failure."""
-        if self._jax_ok:
-            try:
-                return self._jax_gradient(v)
-            except Exception:
-                self._jax_ok = False
-        return super().gradient(v)
-
-    def hessian(self, v):
-        """Exact Hessian via jax.hessian; MUST be symmetric (JAX guarantees this)."""
-        if self._jax_ok:
-            try:
-                return self._jax_hessian(v)
-            except Exception:
-                self._jax_ok = False
-        return super().hessian(v)
-
-    # Internal
-
-    def _ensure_compiled(self):
-        if self._compiled_version == self._constraint_version:
-            return
-        if not self._constraints:
-            self._jax_grad_fn = self._jax_hess_fn = None
-            self._compiled_version = self._constraint_version
-            return
-        # Snapshot stiffness values at compile time.
-        snapshot = [(fn, float(h.stiffness)) for fn, h in self._constraints.values()]
-
-        def total_energy(v_jax):
-            return sum(lam * fn(v_jax) for fn, lam in snapshot)
-
-        self._jax_grad_fn = jax.jit(jax.grad(total_energy))
-        self._jax_hess_fn = jax.jit(jax.hessian(total_energy))
-        self._compiled_version = self._constraint_version
-
-    def _jax_gradient(self, v):
-        self._ensure_compiled()
-        if self._jax_grad_fn is None:
-            return np.zeros(self.dim)
-        return np.asarray(self._jax_grad_fn(jnp.array(v, dtype=jnp.float64)),
-                          dtype=np.float64)
-
-    def _jax_hessian(self, v):
-        self._ensure_compiled()
-        if self._jax_hess_fn is None:
-            return np.zeros((self.dim, self.dim))
-        return np.asarray(self._jax_hess_fn(jnp.array(v, dtype=jnp.float64)),
-                          dtype=np.float64)
+from mpc_packs.jax_substrate.pack import JAXSubstrate  # noqa: E402,F401
 
 
 def _make_jax_cluster(cluster_id, dim, local_budget, bus,
@@ -365,112 +280,9 @@ def scale_validation(dim=16, E_star=50.0, n_engines=10, n_steps=200,
 #  TASK 3 - AutoCluster  (RFC-001 S4.3 extension)
 # ================================================================================
 
-class AutoCluster(MPCCluster):
-    """
-    RFC-001 S4.3-conforming self-organising cluster.
-
-    Subclasses MPCCluster - does NOT re-implement cluster logic from scratch.
-    Uses JAXSubstrate when available (replaced before engines are added).
-
-    Self-regulation rules applied in step():
-      dominant_phase == r:                     do nothing
-      dominant_phase == s, count_s < n_max:    spawn engine (up to max_engines)
-      dominant_phase == k:                     shed_load(0.3)
-      engine in r-state for >= 50 steps:       cull (keep >= 1)
-
-    Constructor: (dim, E_star, max_engines, bus) - no n_engines required.
-
-    RFC-001 compliance:
-      Holds exactly one Substrate and one EventBus (both inherited).
-      No Calorimeter reference.
-      New methods do not alter the existing RFC-001 interface.
-    """
-
-    _CULL_THRESHOLD = 50
-
-    def __init__(self, dim, E_star, max_engines, bus, E_c=0.5, E_s=2.0):
-        cluster_id = f"auto_{uuid.uuid4().hex[:6]}"
-        super().__init__(cluster_id, dim, E_star, bus, E_c, E_s, alpha=0.10)
-        self.max_engines = max_engines
-
-        # Replace plain Substrate with JAXSubstrate BEFORE adding any engines.
-        if _JAX:
-            jax_sub      = JAXSubstrate(dim=dim, E_c=E_c, E_s=E_s, epsilon=1e-4)
-            self.sub     = jax_sub
-            self.ops.sub = jax_sub
-
-        # Per-engine consecutive r-state step counter
-        self._r_streak: Dict[int, int] = {}
-
-        # Seed with one engine (minimum for separation_bound() to evaluate)
-        self._spawn_engine()
-
-    # New public interface
-
-    def step(self):
-        """
-        Advance all engines one step, then self-regulate population size.
-
-        Calls only RFC-001 S4.3 interface methods:
-        diffuse, add_engine, shed_load, dominant_phase,
-        count_s_state, separation_bound.
-        """
-        self.diffuse(n_steps=1)
-        self._update_r_streaks()
-        self._cull_stale_engines()
-        self._regulate()
-
-    def population_report(self) -> Dict[str, Any]:
-        """
-        Snapshot of current engine population.
-
-        Keys: n_engines, n_committed, n_suspended, n_conflict, n_reset,
-              separation_bound.
-        """
-        phases = [e.phase for e in self.engines]
-        sb     = self.separation_bound() if self.engines else 0.0
-        return {
-            "n_engines":        len(self.engines),
-            "n_committed":      sum(1 for p in phases if p == Phase.C),
-            "n_suspended":      sum(1 for p in phases if p == Phase.S),
-            "n_conflict":       sum(1 for p in phases if p == Phase.K),
-            "n_reset":          sum(1 for p in phases if p == Phase.R),
-            "separation_bound": round(sb, 2),
-        }
-
-    # Internal
-
-    def _spawn_engine(self):
-        eng   = self.add_engine(E_star=self.local_budget, dt=0.01)
-        eng.v = np.random.randn(self.sub.dim) * 0.05
-        self._r_streak[id(eng)] = 0
-        return eng
-
-    def _regulate(self):
-        dp = self.dominant_phase
-        if dp == Phase.R:
-            pass
-        elif dp == Phase.S:
-            n_s   = self.count_s_state()
-            n_max = self.separation_bound() if self.engines else 0.0
-            if n_s < n_max and len(self.engines) < self.max_engines:
-                self._spawn_engine()
-        elif dp == Phase.K:
-            self.shed_load(0.3)
-
-    def _update_r_streaks(self):
-        for eng in self.engines:
-            eid = id(eng)
-            self._r_streak[eid] = (self._r_streak.get(eid, 0) + 1
-                                   if eng.phase == Phase.R else 0)
-
-    def _cull_stale_engines(self):
-        to_cull  = [e for e in self.engines
-                    if self._r_streak.get(id(e), 0) >= self._CULL_THRESHOLD]
-        max_cull = max(0, len(self.engines) - 1)   # keep >= 1
-        for eng in to_cull[:max_cull]:
-            self.engines.remove(eng)
-            self._r_streak.pop(id(eng), None)
+# Canonical definition now lives in mpc_packs.auto_cluster (carved
+# Session 8). Re-exported here so Session-2-era callers keep working.
+from mpc_packs.auto_cluster.pack import AutoCluster  # noqa: E402,F401
 
 
 def smoke_test_autocluster() -> bool:
