@@ -52,6 +52,7 @@ class DynamicalGate:
         self,
         window: int = 500,
         tau_floor: float = 0.05,
+        tau_floor_exit: Optional[float] = None,
         dt: float = DT,
         recompute_interval: int = 100,
         burn_frac: float = 0.2,
@@ -63,6 +64,17 @@ class DynamicalGate:
             raise ValueError(f"burn_frac must be in [0, 1), got {burn_frac}")
         self.window = window
         self.tau_floor = tau_floor
+        # Hysteresis exit threshold: above this, engine is treated as
+        # unpinned. Defaults to 2 × tau_floor so a single boundary dip
+        # does not produce spurious release/re-release oscillations.
+        self.tau_floor_exit = (
+            tau_floor_exit if tau_floor_exit is not None else 2.0 * tau_floor
+        )
+        if self.tau_floor_exit < tau_floor:
+            raise ValueError(
+                f"tau_floor_exit ({self.tau_floor_exit}) must be >= "
+                f"tau_floor ({tau_floor})"
+            )
         self.dt = dt
         self.recompute_interval = max(1, recompute_interval)
         self.burn_frac = burn_frac
@@ -74,6 +86,9 @@ class DynamicalGate:
         self._trip_count: int = 0
         self._last_trip_step: Optional[int] = None
         self._tripped: bool = False
+        # Edge-trigger state. Starts unpinned; transitions are detected by
+        # comparing current tau against the hysteresis thresholds.
+        self._is_pinned: bool = False
 
     def observe(
         self,
@@ -107,15 +122,29 @@ class DynamicalGate:
             C = autocorr_fft(e_centered, normalize=True)
             self._tau_estimate = tau_integral(C, self.dt)
 
-        if self._tau_estimate < self.tau_floor:
+        # Edge-triggered state machine with hysteresis. Fire only on the
+        # transition from unpinned into pinned; a steady pinned engine
+        # produces one release, not one per recompute.
+        if not self._is_pinned and self._tau_estimate < self.tau_floor:
+            self._is_pinned = True
             self._tripped = True
             self._trip_count += 1
             self._last_trip_step = self._step
+        elif self._is_pinned and self._tau_estimate > self.tau_floor_exit:
+            self._is_pinned = False
 
     def should_release(self) -> bool:
-        """True on the most recent `observe()` if the tau estimate fell
-        below the floor on that observation's recompute."""
+        """True on the single `observe()` that transitioned the engine
+        from unpinned into pinned. Edge-triggered — a sustained pinned
+        engine produces exactly one release, not one per recompute."""
         return self._tripped
+
+    @property
+    def is_pinned(self) -> bool:
+        """Current (level) pinned state, updated every recompute with
+        hysteresis. True while tau_E has most recently been below
+        `tau_floor` and has not yet risen above `tau_floor_exit`."""
+        return self._is_pinned
 
     @property
     def tau_estimate(self) -> Optional[float]:

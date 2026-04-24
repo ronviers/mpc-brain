@@ -29,24 +29,28 @@ from mpc_packs.physics_primitives import (
 
 def test_warmup_and_constant_energy():
     """Buffer warm-up is silent. Constant-energy observable → variance
-    below floor → tau set to 0 on first recompute → trip."""
+    below floor → tau set to 0 on first recompute → exactly one edge
+    trip (enter pinned), no further trips while pinned."""
     gate = DynamicalGate(
         window=50, tau_floor=0.05, dt=0.01,
         recompute_interval=10, burn_frac=0.2,
     )
     const_energy = lambda v: 1.0
 
-    # Warm-up: first 49 observations buffer only.
     for _ in range(49):
         gate.observe(np.zeros(2), const_energy)
     assert gate.trip_count == 0, "no trips during warm-up"
     assert gate.tau_estimate is None
+    assert gate.is_pinned is False
 
-    # Fill the buffer; next recompute fires on step divisible by 10.
-    for _ in range(11):
+    # Multiple recomputes after buffer fills. Edge fires once on entry.
+    for _ in range(55):
         gate.observe(np.zeros(2), const_energy)
-    assert gate.trip_count >= 1, "constant energy should trip (max pinning)"
+    assert gate.trip_count == 1, (
+        f"constant energy should edge-fire exactly once, got {gate.trip_count}"
+    )
     assert gate.tau_estimate == 0.0
+    assert gate.is_pinned is True
 
 
 def test_oscillating_energy_above_floor():
@@ -113,21 +117,19 @@ def run_scenario_calibration(n_steps: int = 3000):
 
 
 def test_scenarios_separate_pinned_from_mobile():
-    """The gate fires in pinned regimes (committed, conflict) and stays
-    near-silent in mobile regimes (suspended, reset). This is the
-    inverted-semantics we wanted: FDR releases exactly where
-    trajectory-only observables cannot separate C from K.
+    """Edge-triggered: pinned regimes fire once at basin entry, mobile
+    regimes either don't fire or fire at most once from a boundary dip.
+    A steady pinned engine produces one release, not 26.
 
-    Empirical rates at n_steps=3000 (26 recomputes after warmup):
+    Empirical counts at n_steps=3000 (26 recomputes after warmup):
 
-        committed  26/26 = 100%   tau range 0.007-0.016
-        conflict   26/26 = 100%   tau range 0.004-0.007
-        suspended   1/26 =   4%   tau range 0.049-0.352  (one boundary dip)
-        reset       0/26 =   0%   tau range 0.118-0.708
+        committed  1 trip (fires on first recompute, stays pinned)
+        conflict   1 trip (same)
+        suspended  1 trip (boundary dip to tau=0.049 around step ~1400)
+        reset      0 trips (tau always well above exit threshold)
 
-    Asserted bounds: pinned ≥ 20 trips, mobile ≤ 3 trips. This tolerates
-    occasional transient dips near the floor while still requiring
-    ~7× separation in trip rate.
+    Asserted: pinned scenarios trip exactly once and `is_pinned` is
+    True at end. Mobile scenarios trip at most once. reset never trips.
     """
     results = run_scenario_calibration()
     pinned = {"committed", "conflict"}
@@ -135,24 +137,20 @@ def test_scenarios_separate_pinned_from_mobile():
 
     for name in pinned:
         trips, tau = results[name]
-        assert trips >= 20, (
-            f"{name} (pinned) should trip most recomputes, "
+        assert trips == 1, (
+            f"{name} (pinned) should edge-fire exactly once, "
             f"got trips={trips}, tau={tau}"
         )
 
     for name in mobile:
         trips, tau = results[name]
-        assert trips <= 3, (
-            f"{name} (mobile) should stay near-silent, "
+        assert trips <= 1, (
+            f"{name} (mobile) should fire at most once, "
             f"got trips={trips}, tau={tau}"
         )
 
-    # Separation: pinned rate is at least 7x mobile rate.
-    pinned_trips = sum(results[n][0] for n in pinned)
-    mobile_trips = sum(results[n][0] for n in mobile)
-    assert pinned_trips >= 7 * max(mobile_trips, 1), (
-        f"pinned/mobile separation too small: "
-        f"pinned={pinned_trips}, mobile={mobile_trips}"
+    assert results["reset"][0] == 0, (
+        f"reset should not fire at all, got {results['reset']}"
     )
     return results
 

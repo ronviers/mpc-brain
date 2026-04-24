@@ -39,16 +39,22 @@ Measured over the four canonical Session-A scenarios with a
 | reset     | 0.8 – 2.1      | mobile  |
 
 A `tau_floor = 0.05` sits ~5× above the pinned estimates and ~5× below
-the mobile ones. Trip rate across 26 recomputes per scenario:
+the mobile ones. The gate is edge-triggered with hysteresis
+(`tau_floor_exit = 2 × tau_floor = 0.10`), so a pinned engine produces
+**one** release at basin entry rather than one per recompute:
 
-| Scenario  | Trip rate | τ range over recomputes |
-|-----------|-----------|--------------------------|
-| conflict  | 26/26 = 100% | 0.004 – 0.007         |
-| committed | 26/26 = 100% | 0.007 – 0.016         |
-| suspended |  1/26 =   4% | 0.049 – 0.352 (one boundary dip) |
-| reset     |  0/26 =   0% | 0.118 – 0.708         |
+| Scenario  | Edge trips | Final state | τ range over 26 recomputes |
+|-----------|-----------|-------------|--------------------------|
+| conflict  | 1         | pinned      | 0.004 – 0.007            |
+| committed | 1         | pinned      | 0.007 – 0.016            |
+| suspended | 1         | unpinned    | 0.049 – 0.352 (one boundary dip to 0.049) |
+| reset     | 0         | unpinned    | 0.118 – 0.708            |
 
-25× separation in trip rate between pinned and mobile classes.
+Edge-triggering cuts per-trajectory release count from ~26 to 1 for
+pinned engines, ~26× reduction in the expensive `measure_fdr` work.
+The suspended scenario's one trip is a single boundary dip — the
+hysteresis exit at 0.10 prevents it from re-triggering once τ climbs
+back above the band.
 
 ## API
 
@@ -81,11 +87,14 @@ defaults that's ~500 samples every 100 steps, negligible compared to
 
 Observables exposed:
 
-- `should_release() -> bool` — true on the most-recent observe if τ was
-  below the floor on that recompute.
-- `tau_estimate -> Optional[float]` — most-recent τ estimate, or `None`
-  before the buffer fills.
-- `trip_count`, `last_trip_step` — cumulative bookkeeping.
+- `should_release() -> bool` — True on the single `observe()` where
+  the engine transitioned from unpinned to pinned. Edge-triggered.
+- `is_pinned -> bool` — current level state, updated every recompute
+  with hysteresis. True while τ_E has been below `tau_floor` and has
+  not yet risen above `tau_floor_exit`.
+- `tau_estimate -> Optional[float]` — most-recent τ estimate, or
+  `None` before the buffer fills.
+- `trip_count`, `last_trip_step` — cumulative edge-fire bookkeeping.
 
 ## Release chain (`release.py`)
 
@@ -149,13 +158,7 @@ The end-to-end test is asserted, not just demonstrated:
    streaming τ buffer. Per-proposition violations V_A or PCA-projected
    coordinates may give cleaner signal in multi-proposition
    experiments.
-2. **Edge-triggered release.** The gate fires every recompute while
-   pinned (level-triggered). A pinned engine over 3000 steps with
-   `recompute_interval=100` would fire ~26 releases, each ~8 s —
-   ~200 s of compute per trajectory, which is too expensive for online
-   use. Edge-triggered release (fire on the transition *into* pinned,
-   not while pinned) cuts this to 1 release per basin entry.
-3. **Streaming γ_A, γ_ij, tau_A.** `release_and_classify` currently
+2. **Streaming γ_A, γ_ij, tau_A.** `release_and_classify` currently
    requires the caller to supply streaming-estimator values for these.
    A companion class that maintains them alongside the gate's τ_E
    estimator would make integration a single-object attach.
