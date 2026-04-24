@@ -37,9 +37,11 @@ negotiable; everything else is.
 ├─────────────────────────────────────────────────────────────────┤
 │                            PACKS                                │
 │   physics_primitives · dynamical_gate                           │
-│   jax_substrate · auto_cluster · decaying_substrate             │
-│   effector · z3_socket · metareasoner · symbolic_forebrain      │
-│   persistence_substrate · mobility_detector (shelved)           │
+│   jax_substrate · auto_cluster                                  │
+│   decaying_substrate · persistence_substrate                    │
+│   effector · observation_socket · llm_encoder                   │
+│   lateral_cluster · z3_socket · metareasoner                    │
+│   symbolic_forebrain · mobility_detector (shelved)              │
 ├─────────────────────────────────────────────────────────────────┤
 │                           KERNEL                                │
 │  Substrate · Engine · Cluster · Network · EventBus · Phase      │
@@ -120,9 +122,12 @@ mpc-brain/
 │   ├── jax_substrate/                 # JAX-accelerated Substrate
 │   ├── auto_cluster/                  # self-organising MPCCluster (RFC-001 §4.3)
 │   ├── decaying_substrate/            # temporal frustration decay (AMEND-001)
+│   ├── persistence_substrate/         # AMEND-006 (PersistenceSubstrate + Cluster)
 │   ├── effector/                      # commit-accounting subscriber (AMEND-005)
-│   ├── persistence_substrate/         # S4 carve-out (transitional shim)
-│   ├── z3_socket/                     # Z3-backed ObservationSocket
+│   ├── lateral_cluster/               # AMEND-003 lateral maintenance field
+│   ├── observation_socket/            # AMEND-004 ObservationSocket family
+│   ├── llm_encoder/                   # natural-language → constraint encoder
+│   ├── z3_socket/                     # Z3-backed ObservationSocket (concrete)
 │   ├── metareasoner/                  # EventSubscriber, per-cluster signals
 │   └── symbolic_forebrain/            # Governor
 │
@@ -331,14 +336,16 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
   `mpc_kernel.rfc001.*`, `mpc_engine_rfc001`, or
   `experiments.historical.mpc_session4`. Session 4's shadow
   `PhaseTransitionEvent` dataclass is retired.
-- **Pack carve-out landed for all Session-6 targets.** First-class
-  packs: `physics_primitives`, `dynamical_gate`, `jax_substrate`,
-  `auto_cluster`, `decaying_substrate`, `effector`, `z3_socket`,
-  `metareasoner`, `symbolic_forebrain`, `mobility_detector` (shelved).
-  Remaining transitional shim: `persistence_substrate`. Remaining
-  historical monolith residents planned for Session 9:
-  `LateralCluster`, `ObservationSocket`/`AnthropicSocket`/`ConstraintSpec`,
-  `LLMConstraintEncoder`, `PersistenceCluster`/`PersistenceSubstrate`.
+- **Pack carve-out is complete.** Twelve first-class packs (plus
+  `mobility_detector` shelved). No transitional shims remain. Every
+  meaningful class from the Session-2/3/4 monoliths now has a proper
+  pack with declared dependencies, real tests, and a README. The
+  historical .py files in `experiments/historical/` shrunk from
+  ~3300 LOC to ~1700 LOC and consist almost entirely of re-export
+  statements + acceptance-test scaffolding. `InstrumentedEngine` is
+  retired to an alias of the kernel `MetastableEngine` (Session 6's
+  unification of `PhaseTransitionEvent.energy` made the distinct
+  class redundant).
 - **Dynamical track.** `mpc_packs/physics_primitives` provides the
   Langevin observables and the four-regime classifier
   `classify_phase_dynamical(...)`. `mpc_packs/dynamical_gate` layers
@@ -368,8 +375,9 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
 | 6 | Physics-primitives pack carve-out from `docs/dynamical-track/`; kernel events carved out of the legacy monolith shim; `classify_phase_dynamical` + `PhaseTransitionEvent.fdr_slope` wired end-to-end. | complete |
 | 7 | Streaming-τ `dynamical_gate` pack: edge-triggered FDR release, `StreamingObservables` companion, `DynamicalEngine(MetastableEngine)` drop-in that auto-populates `PhaseTransitionEvent.fdr_slope`. One failed design (Maya mobility gate) shelved as `mobility_detector`. | complete |
 | 8 | Async release worker. Top-level session-monolith shims + unified event / `Calorimeter` type identity. First-class packs carved: `jax_substrate`, `auto_cluster`, `effector`, `decaying_substrate` (promoted from shim). `DynamicalEngine` in the maze experiment; all six TASK-5 criteria PASS. | complete |
-| 9 | Remaining S3/S4 carve-outs (`LateralCluster`, `ObservationSocket` + `AnthropicSocket` + `ConstraintSpec`, `LLMConstraintEncoder`, `PersistenceCluster` + `PersistenceSubstrate`, retire `InstrumentedEngine`). Tolman experimental battery. Maze determinism / seeding. | planned |
-| 10 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
+| 9 | Final S2/S3/S4 carve-out closes the shim era: `lateral_cluster`, `observation_socket`, `llm_encoder`, `persistence_substrate` (promoted from shim). `InstrumentedEngine` retired to an alias of `MetastableEngine`. Twelve first-class packs total. | complete |
+| 10 | Maze determinism / seeding. Tolman experimental battery (latent learning, detour, shortcut, reversal). Optional: audit / retire `mpc_engine_rfc001.py` parallel implementations. | planned |
+| 11 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
 | 9+ | Persistence-doc packs land per RFC-002 Appendix A. | queued |
 
 The cleanest stopping condition: if Session 7's behavioural curves
