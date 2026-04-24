@@ -8,5 +8,11 @@ from K and FDR is load-bearing.
 """
 
 from .pack import DynamicalGate
+from .release import FDRRelease, release_and_classify, release_fdr_slope
 
-__all__ = ["DynamicalGate"]
+__all__ = [
+    "DynamicalGate",
+    "FDRRelease",
+    "release_and_classify",
+    "release_fdr_slope",
+]

@@ -14,9 +14,17 @@ import os
 
 import numpy as np
 
+from mpc_kernel.rfc001.events import PhaseTransitionEvent
+from mpc_kernel.rfc001.phase import Phase
 from mpc_packs.dynamical_gate.config import DynamicalGateConfig
 from mpc_packs.dynamical_gate.pack import DynamicalGate
-from mpc_packs.physics_primitives import DT, run_langevin
+from mpc_packs.dynamical_gate.release import release_and_classify
+from mpc_packs.physics_primitives import (
+    DT,
+    correlation_time,
+    run_langevin,
+    survival_margin,
+)
 
 
 def test_warmup_and_constant_energy():
@@ -154,6 +162,80 @@ def test_scenarios_separate_pinned_from_mobile():
 from typing import Optional  # noqa: E402
 
 
+# ── End-to-end wire: gate → measure_fdr → classifier → event ────────────────
+
+
+def test_end_to_end_committed_wire():
+    """Run the gate on a committed trajectory until it trips, release
+    measure_fdr at the trip position, classify, and populate
+    PhaseTransitionEvent.fdr_slope. Asserts:
+
+      - The gate trips (tau_E drops below the floor).
+      - measure_fdr's scaled slope matches the Session-A committed
+        reference (+0.96) to two decimals — same machinery, same params.
+      - classify_phase_dynamical returns Phase.C given that slope.
+      - The resulting PhaseTransitionEvent carries a non-None fdr_slope.
+
+    Takes ~8 s on CPU (the full-budget measure_fdr call). Skipped when
+    DYNAMICAL_GATE_SKIP_SCENARIOS=1.
+    """
+    U = _SCENARIOS["committed"][0]
+    v0 = _SCENARIOS["committed"][1]
+    V_A = lambda v: _V_dist(v, _A, 1.2, 1.0)
+    h_mag = 0.05
+
+    # 1. Run the gate on the committed trajectory until first trip.
+    traj = run_langevin(U, v0, 1500, rng=np.random.default_rng(2026))
+    gate = DynamicalGate(window=500, tau_floor=0.05, recompute_interval=100)
+    first_trip_step = None
+    for i, v in enumerate(traj):
+        gate.observe(v, U)
+        if gate.should_release() and first_trip_step is None:
+            first_trip_step = i
+            break
+    assert first_trip_step is not None, "committed scenario should trip"
+
+    # 2. Compute streaming observables on what the gate has seen so far.
+    v_at_trip = traj[first_trip_step]
+    past = traj[:first_trip_step]
+    U_bath = lambda v: 0.15 * np.sum((v - _MID) ** 2)
+    bath = run_langevin(U_bath, _MID, first_trip_step,
+                        rng=np.random.default_rng(42))
+    tau_A = correlation_time(V_A, past)
+    tau_env = correlation_time(V_A, bath)
+    gamma_A, _, _ = survival_margin(V_A, past, bath)
+
+    # 3. Release FDR at the trip position.
+    release = release_and_classify(
+        v_at_trip, U, V_A,
+        tau_A=tau_A, tau_env=tau_env, gamma_A=gamma_A,
+        h_mag=h_mag,
+    )
+    assert release.phase == Phase.C, (
+        f"committed expected Phase.C, got {release.phase} "
+        f"with slope={release.fdr_slope:+.3f}"
+    )
+    # Match against Session-A reference (+0.96) to two decimals.
+    assert abs(release.fdr_slope - 0.96) < 0.02, (
+        f"committed slope drift from Session-A reference +0.96: "
+        f"got {release.fdr_slope:+.3f}"
+    )
+
+    # 4. Populate PhaseTransitionEvent.fdr_slope.
+    evt = PhaseTransitionEvent(
+        from_phase=Phase.S, to_phase=release.phase,
+        position=v_at_trip.copy(),
+        timestamp=first_trip_step * DT,
+        cluster_id="committed-demo",
+        energy=float(U(v_at_trip)),
+        fdr_slope=release.fdr_slope,
+    )
+    assert evt.fdr_slope is not None
+    assert evt.to_phase == Phase.C
+
+    return release, evt
+
+
 if __name__ == "__main__":
     print("dynamical_gate pack — sanity tests")
     print("=" * 62)
@@ -172,5 +254,14 @@ if __name__ == "__main__":
         for name, (trips, tau) in results.items():
             tau_str = f"{tau:.4f}" if tau is not None else "none"
             print(f"    {name:<10}  trips={trips:>3}  tau_E={tau_str}")
+
+        release, evt = test_end_to_end_committed_wire()
+        print(f"[4] end-to-end committed wire")
+        print(f"    fdr_slope={release.fdr_slope:+.3f}  "
+              f"phase={release.phase.name}  "
+              f"wall={release.wall_time_s:.1f}s")
+        print(f"    event: from={evt.from_phase.name} "
+              f"to={evt.to_phase.name}  "
+              f"fdr_slope={evt.fdr_slope:+.3f}")
 
     print("\nAll tests pass.")
