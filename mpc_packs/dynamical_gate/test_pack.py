@@ -297,6 +297,80 @@ def test_dynamical_engine_populates_fdr_slope():
     return eng, events, len(slopes_populated), len(slopes_none)
 
 
+def _committed_engine(cluster_id: str, async_release: bool):
+    """Helper: build a DynamicalEngine on the committed substrate."""
+    sub = Substrate(dim=2, E_c=0.50, E_s=2.00)
+    sub.register("pA", lambda v: (np.linalg.norm(v - _A) - 1.2) ** 2, lam=20.0)
+    sub.register("pB", lambda v: (np.linalg.norm(v - _B) - 1.0) ** 2, lam=20.0)
+    U_bath = lambda v: 0.15 * np.sum((v - _MID) ** 2)
+    bath = run_langevin(U_bath, _MID, 500, rng=np.random.default_rng(42))
+    V_A = lambda v: (np.linalg.norm(v - _A) - 1.2) ** 2
+
+    gate = DynamicalGate(window=300, tau_floor=0.05, recompute_interval=100)
+    obs = StreamingObservables(V_A_fn=V_A, window=300, bath_trajectory=bath)
+    bus = EventBus()
+    eng = DynamicalEngine(
+        substrate=sub, bus=bus, gate=gate, observables=obs,
+        V_obs=V_A, h_mag=0.05, async_release=async_release,
+        E_star=5.0, cluster_id=cluster_id,
+    )
+    eng.v = np.array([1.11, 0.456])
+    return eng
+
+
+def test_async_release_matches_sync_and_does_not_block():
+    """Async release runs measure_fdr in a single-worker background pool.
+    The main stepping loop proceeds at full speed while the measurement
+    runs; the resulting slope is byte-identical to the sync path once
+    harvested.
+
+    Asserts:
+      - Async stepping for 800 steps completes in <1 s wall time
+        (sync takes ~8 s because of the blocking measure_fdr call).
+      - After `wait_for_release()`, release_count is 1.
+      - Async cached_fdr_slope equals the sync cached_fdr_slope to
+        floating-point equality (same inputs → same result).
+    """
+    import time
+
+    # Sync reference.
+    eng_sync = _committed_engine("sync", async_release=False)
+    np.random.seed(2026)
+    for _ in range(800):
+        eng_sync.step()
+    sync_slope = eng_sync.cached_fdr_slope
+    assert sync_slope is not None
+    assert eng_sync.release_count == 1
+
+    # Async under test.
+    eng_async = _committed_engine("async", async_release=True)
+    np.random.seed(2026)
+    t0 = time.time()
+    for _ in range(800):
+        eng_async.step()
+    step_wall = time.time() - t0
+
+    # Stepping must not have blocked on the release. A generous 3 s
+    # threshold accommodates slow CI runners while still failing if the
+    # release ran inline.
+    assert step_wall < 3.0, f"async stepping blocked: {step_wall:.2f} s"
+
+    # The release is still in flight (measure_fdr is ~8 s).
+    assert eng_async.release_in_flight
+
+    # Harvest and compare.
+    eng_async.wait_for_release(timeout=30.0)
+    assert not eng_async.release_in_flight
+    assert eng_async.release_count == 1
+    assert eng_async.cached_fdr_slope == sync_slope, (
+        f"async slope {eng_async.cached_fdr_slope} differs from "
+        f"sync slope {sync_slope}"
+    )
+
+    eng_async.close()
+    return step_wall, sync_slope, eng_async.cached_fdr_slope
+
+
 if __name__ == "__main__":
     print("dynamical_gate pack — sanity tests")
     print("=" * 62)
@@ -331,5 +405,10 @@ if __name__ == "__main__":
               f"cached_slope={eng.cached_fdr_slope:+.3f}  "
               f"events={len(events)}  "
               f"with_slope={n_pop}  none={n_none}")
+
+        step_wall, sync_slope, async_slope = test_async_release_matches_sync_and_does_not_block()
+        print(f"[6] async release non-blocking")
+        print(f"    800 steps wall={step_wall:.2f}s  "
+              f"sync_slope={sync_slope:+.4f}  async_slope={async_slope:+.4f}")
 
     print("\nAll tests pass.")

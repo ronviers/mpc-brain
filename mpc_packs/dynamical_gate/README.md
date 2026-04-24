@@ -197,6 +197,38 @@ exists until the gate fires.
 
 Both tests assert `abs(slope − 0.96) < 0.02`.
 
+## Async release
+
+`DynamicalEngine(..., async_release=True)` submits the measurement to a
+single-worker `concurrent.futures.ThreadPoolExecutor`. The stepping
+loop does not block on `measure_fdr`; the cached slope updates when the
+worker returns. Overlapping releases are suppressed (at most one in
+flight at a time).
+
+Measured on the committed scenario, 800 steps + one release:
+
+| Mode                           | Stepping wall | Total wall | Slope    |
+|--------------------------------|---------------|------------|----------|
+| `async_release=False` (sync)   | 7.91 s        | 7.91 s     | +0.9594  |
+| `async_release=True` (async)   | 0.35 s        | 8.22 s     | +0.9594  |
+
+Stepping runs ~23× faster and the released slope is byte-identical (same
+inputs, same deterministic measurement). Extra ~0.3 s total wall is the
+worker join overhead.
+
+Companion API:
+
+```python
+eng = DynamicalEngine(..., async_release=True)
+for _ in range(n_steps):
+    eng.step()                # non-blocking; worker runs in parallel
+
+if eng.release_in_flight:
+    eng.wait_for_release()    # harvest pending worker into the cache
+
+eng.close()                   # shut down executor cleanly
+```
+
 ## Open
 
 1. **Observable choice.** Currently the caller passes `V_obs`
@@ -204,10 +236,10 @@ Both tests assert `abs(slope − 0.96) < 0.02`.
    streaming τ buffer. Per-proposition violations V_A or PCA-projected
    coordinates may give cleaner signal in multi-proposition
    experiments.
-2. **Asynchronous release.** The gate's edge-fire runs `measure_fdr`
-   synchronously inside `step()`, stalling the engine for ~8 s. With
-   edge-triggering there is typically one stall per basin entry, which
-   is fine for short experiments and for the ones we have now. For
-   long-running experiments this should move to a worker thread: the
-   engine caches the previous slope while the new measurement runs in
-   the background, and the cached value flips when the worker returns.
+2. **Substrate `energy` / `V_obs` function capture.** The async worker
+   receives bare Python callables; if the substrate is mutated during
+   stepping (constraints registered, λ changed), the worker may see
+   inconsistent state. For our current use the substrate is built once
+   at experiment setup — safe — but multi-phase experiments that mutate
+   constraints on the fly need either a substrate snapshot or a
+   pack-level copy-on-write discipline.
