@@ -444,6 +444,13 @@ def evaluate(maze: MazeWorld, cluster, effector, traces: Dict[str, Any]) -> Dict
 # ── entry ────────────────────────────────────────────────────────────────────
 
 def main() -> Dict[str, Any]:
+    # Seed numpy's global RNG so per-run metrics (gate release_count,
+    # cached_fdr_slope, exact action_log) are reproducible across runs.
+    # MetastableEngine.step uses np.random.randn for thermal noise without
+    # carrying its own RNG, so this is the single seeding point that makes
+    # the substrate dynamics deterministic.
+    np.random.seed(SEED)
+
     maze, network, bus, cluster, effector, mr, socket, forebrain = build_world()
 
     print()
