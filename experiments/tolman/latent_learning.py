@@ -17,14 +17,18 @@ DecayingSubstrate / PersistenceSubstrate retains memory of cell wells
 visited during Phase 1, so once the goal_magnet is added the agent
 should descend into a basin that's already partially mapped.
 
-Status (Session 10): the framework runs end-to-end and the engine
-produces deterministic per-condition metrics, but the agent's
-traversal is currently constrained by the existing M1-M5 forebrain
-rules to a small neighbourhood (Session-5 known limitation: the M6
-"remove-behind-cell" rule remains deferred). So neither group reaches
-the goal. The point of this scaffold is to be ready when traversal
-lands; the comparison metric (cells_visited per phase, position trace,
-nearest-cell-to-goal) is collected unconditionally.
+Status (Session 10): the framework runs end-to-end with the M6
+forebrain rule active. The agent traverses — it advances (0,0) ->
+(1,0) -> (1,1) -> (1,2) and makes dozens of phase-C commits per
+run. It does NOT reliably reach the goal in 1500 steps at current
+settings; the ~1 cell / ~375 steps traversal rate means a 7x7 maze
+needs ~10000 steps to reach (6,6) without additional forebrain tuning.
+
+Tolman's classic prediction (latent group reaches goal faster) is
+still untestable in the strict sense, but the scaffold now collects
+meaningful quantitative differences between conditions (cells
+visited per phase, nearest-distance-to-goal, action counts per
+phase) that can be compared even without goal-reaching.
 
 Invocation:
 
@@ -147,7 +151,7 @@ def _build_world(maze, goal_enabled: List[bool]):
         new_eng = DynamicalEngine(
             substrate=old.sub, bus=old.bus,
             gate=gate, observables=obs, V_obs=V_obs, h_mag=0.05,
-            async_release=True,
+            async_release=False,   # sync for determinism in experimental runs
             E_star=old.E_star, dt=old.dt,
             barrier_strength=old.barrier_strength,
             cluster_id=old.cluster_id,
@@ -306,10 +310,24 @@ def main() -> Dict[str, Any]:
               f"control={control['first_goal_step']}. "
               f"{'Latent faster' if latent['first_goal_step'] < control['first_goal_step'] else 'Control faster'}.")
     else:
-        print("  Neither group reached goal in this run — known limitation: "
-              "the M6 'remove-behind-cell' rule remains deferred from "
-              "Session 5/6/9. The framework is ready for when traversal "
-              "lands.")
+        print("  Neither group reached goal in this run (goal is at cell "
+              f"({MAZE_W-1},{MAZE_H-1}), agent ends near start). The M6 "
+              "forebrain rule produces traversal but not yet enough to "
+              "reach the goal in 1500 steps. Extend `N_STEPS_PHASE_{1,2}` "
+              "for longer runs, or tune M6's bias for faster traversal.")
+        # Report softer-than-goal comparison metrics when we have data.
+        ln = latent["nearest_to_goal"]
+        cn = control["nearest_to_goal"]
+        cells_l = latent["cells_total"]
+        cells_c = control["cells_total"]
+        if abs(ln - cn) > 0.01:
+            better = "latent" if ln < cn else "control"
+            print(f"  Nearest-distance comparison: latent={ln:.3f} vs "
+                  f"control={cn:.3f}. ({better} advanced further)")
+        if cells_l != cells_c:
+            better = "latent" if cells_l > cells_c else "control"
+            print(f"  Cells visited: latent={cells_l} vs control={cells_c}. "
+                  f"({better} explored more)")
     return {"latent": latent, "control": control}
 
 
