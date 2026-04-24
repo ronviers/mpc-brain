@@ -9,6 +9,9 @@ from .pack import (
     K_BT,
     DT,
     D_EFF,
+    TAU_CONFLICT_FLOOR,
+    GAMMA_A_RESET_BAND,
+    GAMMA_IJ_K_FLOOR,
     numerical_grad,
     run_langevin,
     run_paired,
@@ -18,12 +21,16 @@ from .pack import (
     survival_margin,
     cross_dissipation,
     measure_fdr,
+    classify_phase_dynamical,
 )
 
 __all__ = [
     "K_BT",
     "DT",
     "D_EFF",
+    "TAU_CONFLICT_FLOOR",
+    "GAMMA_A_RESET_BAND",
+    "GAMMA_IJ_K_FLOOR",
     "numerical_grad",
     "run_langevin",
     "run_paired",
@@ -33,4 +40,5 @@ __all__ = [
     "survival_margin",
     "cross_dissipation",
     "measure_fdr",
+    "classify_phase_dynamical",
 ]

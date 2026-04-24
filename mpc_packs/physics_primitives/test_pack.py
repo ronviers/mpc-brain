@@ -13,9 +13,12 @@ Invocation:
 
 import numpy as np
 
+from mpc_kernel.rfc001.phase import Phase
+
 from mpc_packs.physics_primitives import (
     D_EFF,
     K_BT,
+    classify_phase_dynamical,
     correlation_time,
     measure_fdr,
     run_langevin,
@@ -71,6 +74,23 @@ def test_fdr_harmonic_slope():
     return slope, expected
 
 
+def test_classifier_session_a_table():
+    """Reproduce the four-row classification from SESSION_A_STATE.md using
+    the measured values (tau_A, tau_env, gamma_A, gamma_ij, fdr_slope) as
+    fixed inputs. This exercises the classifier, not the integrator."""
+    cases = [
+        # (tau_A, tau_env, gamma_A, gamma_ij, fdr_slope, expected)
+        ("committed", 0.008, 1.387, +118.5, -21.1, +0.96, Phase.C),
+        ("suspended", 0.426, 1.387, +1.67,  -1.20, +1.35, Phase.S),
+        ("conflict",  0.003, 1.387, +296.1, -27.5, -0.09, Phase.K),
+        ("reset",     1.387, 1.387, +0.00,  +0.02, -1.47, Phase.R),
+    ]
+    for name, tA, tE, gA, gij, slope, expected in cases:
+        got = classify_phase_dynamical(tA, tE, gA, gij, slope)
+        assert got == expected, f"{name}: expected {expected}, got {got}"
+    return cases
+
+
 if __name__ == "__main__":
     print("physics_primitives pack — sanity tests")
     print("=" * 62)
@@ -86,5 +106,8 @@ if __name__ == "__main__":
 
     slope, expected = test_fdr_harmonic_slope()
     print(f"[3] FDR slope (harmonic)    = {slope:.3f}   (expected ~{expected:.3f})   OK")
+
+    cases = test_classifier_session_a_table()
+    print(f"[4] classifier Session-A    4 rows classified, all match   OK")
 
     print("\nAll primitive sanity tests pass.")

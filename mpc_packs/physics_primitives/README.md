@@ -1,12 +1,11 @@
 # physics_primitives
 
-Core observables for the MPC Langevin rig. Provides the primitive layer
-that dynamical-phase classifiers (c / s / k / r per RFC-004) are built
-on top of: overdamped Langevin integration, autocorrelations, integral
-correlation times, survival margin, cross-dissipation, and FDR
-measurement.
-
-**Status:** scaffold. Implementation not yet moved in.
+Core observables for the MPC Langevin rig, plus the dynamical regime
+classifier. Provides overdamped Langevin integration, autocorrelations,
+integral correlation times, survival margin, cross-dissipation, FDR
+measurement, and `classify_phase_dynamical(tau_A, tau_env, gamma_A,
+gamma_ij, fdr_slope) -> Phase` — the Markovian-honest classifier
+calibrated in Task A.
 
 ## Provenance
 
@@ -21,17 +20,8 @@ and become the canonical import path.
 ## Declared dependencies
 
 - `numpy`
+- `mpc_kernel.rfc001.phase.Phase` — classifier return type.
 
 ## Declared mutations
 
-None. Pure numerical library.
-
-## Pickup checklist
-
-If this pack is still a scaffold, the next step is:
-
-1. Copy `docs/dynamical-track/physics_primitives.py` into `pack.py`.
-2. Re-export its public names from `__init__.py`.
-3. Flesh out `test_pack.py` with the committed-well smoke test.
-4. Repoint `docs/dynamical-track/mpc_lattice.py` to import from here.
-5. `git rm` the old copy under `docs/dynamical-track/`.
+None. Pure library.

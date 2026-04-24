@@ -1,9 +1,9 @@
 """physics_primitives — validated core observables for the MPC Langevin rig.
 
 Moved verbatim from docs/dynamical-track/physics_primitives.py (Task A,
-SESSION_A_STATE.md). Do not edit without re-running the four-scenario
-validation in mpc_lattice.py; the constants and integrator parameters are
-load-bearing.
+SESSION_A_STATE.md). Do not edit the numerical routines without re-running
+the four-scenario validation in mpc_lattice.py; the constants and
+integrator parameters are load-bearing.
 
 Public primitives:
 
@@ -12,10 +12,15 @@ Public primitives:
     correlation_time, survival_margin, cross_dissipation,
     measure_fdr,
     numerical_grad,
-    K_BT, DT, D_EFF
+    K_BT, DT, D_EFF,
+    classify_phase_dynamical,
 """
 
+from typing import Optional
+
 import numpy as np
+
+from mpc_kernel.rfc001.phase import Phase
 
 
 # ── Physical constants (natural units, k_BT = 1) ────────────────────────────
@@ -207,3 +212,70 @@ def measure_fdr(U_base, U_pert, V_obs, v0, h_mag,
                   axis=0)
 
     return np.arange(n_resp) * dt, C, chi
+
+
+# ── Dynamical phase classifier ──────────────────────────────────────────────
+#
+# Thresholds calibrated in Task A (SESSION_A_STATE.md) against the four
+# canonical scenarios on the Markovian-Langevin substrate. Substrate-specific;
+# re-calibrate for other substrates.
+
+TAU_CONFLICT_FLOOR = 0.05    # below this, τ_A is noise-floor dominated → pinned
+GAMMA_A_RESET_BAND = 0.30    # |γ_A| < this AND τ_A ≈ τ_env → r
+GAMMA_IJ_K_FLOOR   = 5.0     # |γ_ij| above this flags k-state coupling
+
+
+def classify_phase_dynamical(
+    tau_A: float,
+    tau_env: float,
+    gamma_A: float,
+    gamma_ij: Optional[float] = None,
+    fdr_slope: Optional[float] = None,
+    *,
+    tau_conflict_floor: float = TAU_CONFLICT_FLOOR,
+    gamma_A_reset_band: float = GAMMA_A_RESET_BAND,
+    gamma_ij_k_floor: float = GAMMA_IJ_K_FLOOR,
+) -> Phase:
+    """Classify a dynamical regime into {C, S, K, R} from measured observables.
+
+    Ported from mpc_lattice.classify_regime; returns a Phase enum instead of
+    a single-letter string. Strategy, honest to the Markovian limit
+    (SESSION_A_STATE.md §"Markovian sign caveat"):
+
+        R   |γ_A| small AND τ_A ≈ τ_env              (bath-equilibrated)
+        S   τ_A short but not pinned                  (soft well, fast decorr)
+        C   τ_A at noise floor AND FDT-ish FDR slope  (pinned, compatible)
+        K   τ_A at noise floor AND flat/negative slope
+            (pinned, destructive interference)
+
+    Without an FDR slope, falls back to |γ_ij| magnitude to separate C from K
+    in the pinned regime. Above the pinned floor, a strongly positive γ_ij is
+    the paper's original Table 1 k-signature.
+
+    Parameters
+    ----------
+    tau_A : integral correlation time of V_A along the constrained trajectory.
+    tau_env : integral correlation time along the bath (reset) trajectory.
+    gamma_A : survival margin  τ_A⁻¹ − τ_env⁻¹  (sign inverts on Markovian
+        substrates; |γ_A| is interpreted as regime depth).
+    gamma_ij : optional cross-dissipation between two constraint violations;
+        sign is paper-convention on non-pinned substrates.
+    fdr_slope : optional late-time slope of the parametric FDR plot in scaled
+        units (FDT → slope 1). Required to separate C from K on pinned
+        Markovian substrates.
+    """
+    ratio = tau_A / tau_env if tau_env > 0 else 0.0
+    gA_abs = abs(gamma_A)
+    gij_abs = abs(gamma_ij) if gamma_ij is not None else 0.0
+
+    if gA_abs < gamma_A_reset_band and 0.75 < ratio < 1.33:
+        return Phase.R
+
+    if tau_A < tau_conflict_floor:
+        if fdr_slope is not None:
+            return Phase.K if fdr_slope < 0.5 else Phase.C
+        return Phase.K if gij_abs > 3 * gamma_ij_k_floor else Phase.C
+
+    if gamma_ij is not None and gamma_ij > gamma_ij_k_floor:
+        return Phase.K
+    return Phase.S
