@@ -1,8 +1,7 @@
-"""RFC-001 kernel primitives (shim layer).
+"""RFC-001 kernel primitives.
 
-Re-exports Phase, PhaseTransitionEvent, LandauerEvent, BudgetResetEvent,
-EventBus, and Calorimeter from the shim at `.events`. Callers should import
-these names from `mpc_kernel.rfc001.events` directly.
+Re-exports the canonical event types (`.events`), the event bus (`.bus`),
+and the Calorimeter consumer (`.network`).
 """
 
 from .events import (
@@ -11,8 +10,8 @@ from .events import (
     LandauerEvent,
     BudgetResetEvent,
     EventBus,
-    Calorimeter,
 )
+from .network import Calorimeter
 
 __all__ = [
     "Phase",

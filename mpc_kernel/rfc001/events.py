@@ -1,19 +1,55 @@
-# mpc_kernel/rfc001/events.py
-# Shim for container-side imports. The canonical split lives on the workstation
-# per RFC-002 §6. Session 6 carve-out work replaces this file.
-from mpc_engine_rfc001 import (
-    Phase,
-    PhaseTransitionEvent,
-    LandauerEvent,
-    BudgetResetEvent,
-    EventBus,
-    Calorimeter,
-)
+"""RFC-001 event types.
+
+First-class dataclass definitions, carved out of the historical
+`mpc_engine_rfc001` / `mpc_session4` monoliths. Field shapes match the
+canonical forms established in Session 4 (`PhaseTransitionEvent.energy`
+per AMEND-005) and Session 5 (no engine_id yet — tracked as SESSION-5
+carry-forward item C3).
+"""
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from .bus import EventBus
+from .phase import Phase
+
+
+@dataclass
+class PhaseTransitionEvent:
+    """Emitted by MetastableEngine on phase change (RFC-001 §6)."""
+
+    from_phase: Phase
+    to_phase: Phase
+    position: np.ndarray
+    timestamp: float
+    cluster_id: str
+    energy: float = 0.0
+
+
+@dataclass
+class LandauerEvent:
+    """Emitted on information-erasing operations (RFC-001 §6)."""
+
+    cluster_id: str
+    info_content: float
+    kT: float = 1.0
+
+
+@dataclass
+class BudgetResetEvent:
+    """Emitted when an engine exceeds its local energy budget (RFC-001 §6)."""
+
+    cluster_id: str
+    position: np.ndarray
+    timestamp: float
+    info_cost: float = 1.0
+
+
 __all__ = [
     "Phase",
     "PhaseTransitionEvent",
     "LandauerEvent",
     "BudgetResetEvent",
     "EventBus",
-    "Calorimeter",
 ]
