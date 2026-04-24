@@ -74,6 +74,30 @@ def test_fdr_harmonic_slope():
     return slope, expected
 
 
+def test_event_fdr_slope_round_trip():
+    """Build a PhaseTransitionEvent carrying the committed-well FDR slope
+    from Session A and confirm the classifier agrees with the emitted
+    `to_phase`. Verifies the new optional field is wired through the event
+    dataclass."""
+    from mpc_kernel.rfc001.events import PhaseTransitionEvent
+
+    e = PhaseTransitionEvent(
+        from_phase=Phase.S,
+        to_phase=Phase.C,
+        position=np.zeros(2),
+        timestamp=0.5,
+        cluster_id="test",
+        energy=0.12,
+        fdr_slope=+0.96,
+    )
+    got = classify_phase_dynamical(
+        tau_A=0.008, tau_env=1.387, gamma_A=+118.5,
+        gamma_ij=-21.1, fdr_slope=e.fdr_slope,
+    )
+    assert got == e.to_phase, f"classifier disagreed: {got} vs event.to_phase={e.to_phase}"
+    return e
+
+
 def test_classifier_session_a_table():
     """Reproduce the four-row classification from SESSION_A_STATE.md using
     the measured values (tau_A, tau_env, gamma_A, gamma_ij, fdr_slope) as
@@ -109,5 +133,8 @@ if __name__ == "__main__":
 
     cases = test_classifier_session_a_table()
     print(f"[4] classifier Session-A    4 rows classified, all match   OK")
+
+    e = test_event_fdr_slope_round_trip()
+    print(f"[5] event fdr_slope field   {e.to_phase} via slope={e.fdr_slope:+.2f}   OK")
 
     print("\nAll primitive sanity tests pass.")

@@ -8,6 +8,7 @@ carry-forward item C3).
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 
@@ -17,7 +18,13 @@ from .phase import Phase
 
 @dataclass
 class PhaseTransitionEvent:
-    """Emitted by MetastableEngine on phase change (RFC-001 §6)."""
+    """Emitted by MetastableEngine on phase change (RFC-001 §6).
+
+    `fdr_slope` is populated when the transition was classified using
+    a dynamical measurement (FDR parametric slope in scaled units,
+    FDT → 1). None when the transition came from the topological
+    classifier alone.
+    """
 
     from_phase: Phase
     to_phase: Phase
@@ -25,6 +32,7 @@ class PhaseTransitionEvent:
     timestamp: float
     cluster_id: str
     energy: float = 0.0
+    fdr_slope: Optional[float] = None
 
 
 @dataclass
