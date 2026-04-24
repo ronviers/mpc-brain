@@ -3,8 +3,8 @@
 **A physically-grounded inference architecture built on Metastable Propositional Calculus.**
 
 [![Status](https://img.shields.io/badge/status-active%20development-blue)]()
-[![Standards](https://img.shields.io/badge/standards-RFC--001%20·%20RFC--002%20·%20RFC--003-green)]()
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
+[![Standards](https://img.shields.io/badge/standards-RFC--001%20·%20RFC--002%20·%20RFC--003%20·%20RFC--004-green)]()
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)]()
 
 ---
 
@@ -33,12 +33,11 @@ negotiable; everything else is.
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         EXPERIMENTS                             │
-│       maze · hello-world · multi-cluster · lattice · …          │
+│               hello_world · maze · (dynamical)                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                            PACKS                                │
-│    JAXSubstrate · AutoCluster · Effector · Calorimeter          │
-│   DecayingSubstrate · PersistenceSubstrate · LateralCluster     │
-│      Z3Socket · Metareasoner · SymbolicForebrain · …            │
+│   physics_primitives · z3_socket · metareasoner                 │
+│   symbolic_forebrain · decaying_substrate · persistence_…       │
 ├─────────────────────────────────────────────────────────────────┤
 │                           KERNEL                                │
 │  Substrate · Engine · Cluster · Network · EventBus · Phase      │
@@ -74,13 +73,13 @@ in this order if you are new:
 
 | Document | What it is |
 |---|---|
-| `On_the_Physical_Limits_of_Boolean_Algebra_as_a_Theory_of_Inference.md` | The foundational paper. Defines MPC, the four-state algebra, and the Thermodynamic Separation Theorem. |
 | `RFC-001-MPC-BRAIN.md` | The kernel protocol. Specifies substrate, engine, cluster, network, event bus, and the non-amendable energy invariant. |
 | `RFC-002-MPC-PROJECT-STRUCTURE.md` | How the project is organised. Defines kernel, packs, experiments, plug points, promotion rules, and directory layout. |
-| `RFC-003-MPC-TRACE-FORMAT.md` | The wire format for observing an experiment as it runs or after it finishes. |
-| `MPC-VISION-001.md` | The advisory note that preceded RFC-002. Kept as historical record of the reasoning. |
+| `RFC-003-MPC-TRACE-FORMAT-001.md` | The wire format for observing an experiment as it runs or after it finishes. |
+| `RFC-004-MPC-DYNAMICAL.md` | The dynamical-track extension: regime classification via correlation times and the Fluctuation–Dissipation Ratio, per the Session-A Langevin validation. |
 | `MPC-ANATOMY-001.svg` | A poster-sized visual reference. The three layers, the biology mapping, the promotion ladder. Hang it on a wall. |
-| `Mechanisms_of_Memory_Persistence.md` | Survey of state-of-the-art neurobiology. Source material for the pack roadmap (RFC-002 Appendix A). |
+| `Mechanisms of Memory Persistence.md` | Survey of state-of-the-art neurobiology. Source material for the pack roadmap (RFC-002 Appendix A). |
+| `dynamical-track/` | Research artefacts from the dynamical-track prototyping: `mpc_lattice.py` (Langevin validation rig), `SESSION_A_STATE.md`, the four-scenario figures. |
 
 Session reports (`SESSION-N-REPORT.md`) document specific implementation rounds
 and stand as historical record. They are not normative.
@@ -95,40 +94,35 @@ mpc-brain/
 ├── docs/
 │   ├── RFC-001-MPC-BRAIN.md
 │   ├── RFC-002-MPC-PROJECT-STRUCTURE.md
-│   ├── RFC-003-MPC-TRACE-FORMAT.md
-│   ├── MPC-VISION-001.md
+│   ├── RFC-003-MPC-TRACE-FORMAT-001.md
+│   ├── RFC-004-MPC-DYNAMICAL.md
 │   ├── MPC-ANATOMY-001.svg
-│   ├── Mechanisms_of_Memory_Persistence.md
-│   └── On_the_Physical_Limits_of_Boolean_Algebra...md
+│   ├── Mechanisms of Memory Persistence.md
+│   └── dynamical-track/               # Langevin rig + Session-A artefacts
 │
 ├── mpc_kernel/                        # RFC-001 physics, versioned
-│   ├── __version__.py
+│   ├── __version__.py                 # 0.4.0
 │   └── rfc001/
-│       ├── phase.py                   # Phase enum, classify()
-│       ├── substrate.py               # base Substrate
+│       ├── phase.py                   # Phase enum
+│       ├── substrate.py               # base Substrate, topological classify()
 │       ├── engine.py                  # MetastableEngine
 │       ├── cluster.py                 # MPCCluster
-│       ├── network.py                 # Network
+│       ├── network.py                 # Network, Calorimeter
 │       ├── bus.py                     # EventBus
-│       └── events.py                  # canonical event types
+│       └── events.py                  # PhaseTransitionEvent, LandauerEvent, BudgetResetEvent
 │
 ├── mpc_packs/                         # capability modules
-│   ├── jax_substrate/
-│   ├── auto_cluster/
-│   ├── effector/
-│   ├── calorimeter/
-│   ├── decaying_substrate/
-│   ├── persistence_substrate/
-│   ├── z3_socket/
-│   ├── metareasoner/
-│   ├── symbolic_forebrain/
-│   └── …
+│   ├── physics_primitives/            # Langevin + dynamical classifier
+│   ├── decaying_substrate/            # S3 carve-out (transitional shim)
+│   ├── persistence_substrate/         # S4 carve-out (transitional shim)
+│   ├── z3_socket/                     # Z3-backed ObservationSocket
+│   ├── metareasoner/                  # EventSubscriber, per-cluster signals
+│   └── symbolic_forebrain/            # Governor
 │
-└── experiments/                       # compositions + reports
-    ├── hello_world/
-    ├── multi_cluster/
-    ├── maze/
-    └── lattice/
+└── experiments/
+    ├── hello_world/                   # kernel-only demo (scaffold)
+    ├── maze/                          # Session-5 closed-loop navigation demo
+    └── historical/                    # SESSION-<N>-REPORT.md, legacy scripts
 ```
 
 Every pack directory contains at minimum `pack.py`, `config.py`,
@@ -181,16 +175,15 @@ An experiment is a composition, not a script.
 # experiments/maze/manifest.py
 KERNEL_REQUIRED = "0.4.0"
 PACKS = [
-    ("jax_substrate",         {}),
-    ("auto_cluster",          {}),
-    ("effector",              {}),
     ("decaying_substrate",    {}),
-    ("persistence_substrate", {"usage_coef": 1.0, "outcome_coef": 0.3}),
+    ("persistence_substrate", {"usage_coef": 1.0, "outcome_coef": 0.3,
+                               "tau_base": 200.0}),
     ("z3_socket",             {}),
-    ("metareasoner",          {"window": 50}),
-    ("symbolic_forebrain",    {"plan_library": maze_rules}),
+    ("metareasoner",          {"window": 50, "bucket_tolerance": 0.5}),
+    ("symbolic_forebrain",    {"plan_library": "maze_rules"}),
 ]
-EXPERIMENT_CONFIG = {"maze_w": 7, "maze_h": 7, "n_steps": 1500, ...}
+EXPERIMENT_CONFIG = {"maze_w": 7, "maze_h": 7, "dim": 4,
+                     "n_steps": 1500, "E_c": 0.5, "E_s": 3.0, ...}
 ```
 
 `experiments/<name>/run.py` loads the manifest, attaches the packs to a fresh
@@ -207,8 +200,8 @@ that want traces write them inline.
 
 ## Hello World
 
-The canonical kernel-only demo lives at `experiments/hello_world/`. It loads
-two contradictory propositions simultaneously, observes the cluster enter
+The kernel-only demo lives at `experiments/hello_world/`. It loads two
+contradictory propositions simultaneously, observes the cluster enter
 k-state and shed the weaker, then adds a disambiguating proposition and
 observes commitment.
 
@@ -219,10 +212,11 @@ observes commitment.
 The cluster commits to the P2/P3 neighbourhood. Distance to P1 centre: 3.67.
 Distance to P2 centre: 0.85. The ball hypothesis is correctly rejected.
 
-This demo uses only the kernel plus the default pack manifest
-(`jax_substrate`, `auto_cluster`, `effector`, `calorimeter`). It is the
-reference for "the kernel works." Any candidate kernel revision must not
-break it.
+The current `hello_world/` directory is a scaffold — `run.py` has the
+narrative in place, but `manifest.py` and `report.md` are stubs pending
+the jax_substrate / auto_cluster / effector / calorimeter carve-outs
+(SESSION-5 "What's open" item 1). The maze experiment at
+`experiments/maze/` is the currently-green reference demo.
 
 ---
 
@@ -273,13 +267,14 @@ memory as metastability, Landauer gap) are in the foundational paper.
 
 ## Performance notes
 
-The `jax_substrate` pack uses `jax.jit(jax.grad(...))` and
-`jax.jit(jax.hessian(...))`. Stiffness values bake into the XLA computation
-at compile time; `register`, `deregister`, and `update_lambda` each bump
-a version counter that forces recompilation on the next call, so stiffness
-changes are never silently stale.
+The JAX-accelerated substrate (`jax_substrate`, not yet carved into a
+pack — lives in the historical monolith) uses `jax.jit(jax.grad(...))`
+and `jax.jit(jax.hessian(...))`. Stiffness values bake into the XLA
+computation at compile time; `register`, `deregister`, and
+`update_lambda` each bump a version counter that forces recompilation
+on the next call, so stiffness changes are never silently stale.
 
-Measured on CPU (no GPU):
+Measured on CPU (no GPU), pre-carve-out:
 
 | Backend | dim | Steps | Time |
 |---|---|---|---|
@@ -304,18 +299,29 @@ experiment manifest; the default manifest has no external dependencies.
 
 ## Status
 
-RFC-002 is normative as of April 2026. The migration from the flat
-one-file-per-session layout is **staged**:
+RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
 
-- **Step 0** (kernel surgery and directory scaffold) — planned for Session 5.
-- **Pack carve-out** — S2/S3/S4 capabilities are moved into `mpc_packs/` opportunistically as new experiments need them. S6 is the first dedicated housekeeping round.
-- **First RFC-002-native session** — Session 5 (maze experiment). See `SESSION-5-TASK-PROMPT-v3.md`.
-
-If you are reading this before Session 5 has completed, some of the
-directory structure above describes a target, not current reality. The
-legacy files (`mpc_engine_rfc001.py`, `mpc_session2.py`, `mpc_session3.py`,
-`mpc_session4.py`) remain in place and functional; imports from them are
-preserved via a deprecation shim during migration.
+- **Kernel** imports end-to-end. `mpc_kernel/rfc001/events.py` carries
+  first-class `@dataclass` definitions for `PhaseTransitionEvent`,
+  `LandauerEvent`, and `BudgetResetEvent` (Session 6 carve-out).
+  `PhaseTransitionEvent` carries an optional `fdr_slope` field for
+  dynamical classification.
+- **Pack carve-out is partial.** `physics_primitives`, `z3_socket`,
+  `metareasoner`, and `symbolic_forebrain` are first-class packs.
+  `decaying_substrate` and `persistence_substrate` are transitional
+  shims re-exporting from the historical monoliths in
+  `experiments/historical/` (`mpc_session3.py`, `mpc_session4.py`).
+  `jax_substrate`, `auto_cluster`, `effector`, and `calorimeter` have
+  not yet been carved out; callers import from the historical
+  monoliths via the shim path.
+- **Dynamical track.** `mpc_packs/physics_primitives` provides the
+  Langevin observables (`run_langevin`, `correlation_time`,
+  `survival_margin`, `cross_dissipation`, `measure_fdr`) and the
+  four-regime classifier `classify_phase_dynamical(...)`. Validated
+  against the Session-A four-scenario table; full rig reproduces via
+  `python docs/dynamical-track/mpc_lattice.py`.
+- **Latest green experiment:** `experiments/maze/` (Session 5, 1500-step
+  closed-loop navigation demo).
 
 ---
 
@@ -327,9 +333,9 @@ preserved via a deprecation shim during migration.
 | 2 | JAXSubstrate, AutoCluster, LLMConstraintEncoder, hello-world demo | complete |
 | 3 | Temporal frustration decay, lateral maintenance field, ObservationSocket, multi-cluster demo | complete |
 | 4 | Effector (total-cost accounting), PersistenceSubstrate, network demo | complete |
-| 5 | **First RFC-002-native session.** Kernel surgery, three new packs (Z3Socket, Metareasoner, SymbolicForebrain), first maze navigation experiment. | in progress |
-| 6 | Housekeeping: carve out S2/S3/S4 packs, remove deprecation shim, `TraceWriter` pack, sliding-window retention. | planned |
-| 7 | Tolman experimental battery: latent learning, detour problems, shortcut problems, reversal learning. First full test of cognitive-map claims. | planned |
+| 5 | First RFC-002-native session. Kernel surgery, three new packs (Z3Socket, Metareasoner, SymbolicForebrain), first maze navigation experiment. | complete |
+| 6 | Physics-primitives pack carve-out from `docs/dynamical-track/`; kernel events carved out of the legacy monolith shim; `classify_phase_dynamical` + `PhaseTransitionEvent.fdr_slope` wired end-to-end. | complete |
+| 7 | Online FDR estimator; remainder of S2/S3/S4 pack carve-out (`jax_substrate`, `auto_cluster`, `effector`, `calorimeter`); Tolman experimental battery. | planned |
 | 8 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
 | 9+ | Persistence-doc packs land per RFC-002 Appendix A. | queued |
 
