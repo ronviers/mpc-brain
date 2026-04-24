@@ -1,5 +1,5 @@
 MPC Working Group                                         Session Notes
-Request for Comments: 002                         April 2026 (Rev. 2)
+Request for Comments: 002                                  April 2026
 Category: Standards Track
 Updates: None
 Relates to: RFC-001-MPC-BRAIN
@@ -17,26 +17,17 @@ Abstract
    three layers — kernel, packs, and experiments — and the rules that
    govern movement between them.
 
-   Revision 2 adds normative sections covering session budget and
-   scope (§12), the project knowledge base pane (§13), and the
-   session lifecycle (§14, which absorbs the prior standalone
-   SOP_Session_Hand-Off document).  These sections formalise working
-   practices that emerged across Sessions 1 through 5 and codify the
-   budget discipline required to prevent multi-session spirals.
-
    The four-valued state space {c, s, k, r}, the energy invariant of
    RFC-001 §3, and the existing event protocol are unchanged.  This
-   is a packaging and process standard, not a redesign.
+   is a packaging standard, not a redesign.
 
 
 Status of This Memo
 
-   This document is a Standards Track RFC.  Revision 1 promoted the
-   contents of MPC-VISION-001 (advisory) to normative status and
-   superseded the implicit "one new file per session" convention
-   used through Sessions 1 through 4.  Revision 2 adds §§12–14 and
-   retires the standalone SOP_Session_Hand-Off document by
-   absorption into §14.
+   This document is a Standards Track RFC.  It promotes the contents
+   of MPC-VISION-001 (advisory) to normative status and supersedes
+   the implicit "one new file per session" convention used through
+   Sessions 1 through 4.
 
    Comments and objections are invited in the spirit stated in the
    MPC paper: as tests, not obstacles.
@@ -70,24 +61,6 @@ Table of Contents
    9.  Relationship to RFC-001
    10. Tooling and external interfaces
    11. Reference implementation notes
-   12. Session Budget and Scope (Normative)
-       12.1  Deliverable-bounded sessions
-       12.2  Hard budget caps
-       12.3  No re-verification
-       12.4  Completion signature
-       12.5  Session types
-       12.6  Premature termination protocol
-       12.7  Conversation forking
-   13. Project Knowledge Base Files (Normative)
-       13.1  MUST include
-       13.2  MUST NOT include
-       13.3  Refresh rule
-   14. Session Lifecycle (Normative)
-       14.0  Phase 0 — pre-flight
-       14.1  Phase 1 — code demotion and archival
-       14.2  Phase 2 — pack extraction
-       14.3  Phase 3 — experiment containerization
-       14.4  Phase 4 — prepare the next session
    Appendix A.  Pack roadmap (informational)
    Appendix B.  Biological correspondences (informational)
 
@@ -117,11 +90,6 @@ Table of Contents
    defined channels.  This document applies the same discipline to
    the project: separate what changes rarely from what changes often,
    and forbid the latter from modifying the former.
-
-   Revision 2 extends the same discipline to the session process
-   itself.  Sessions, like capabilities, accrete cost when
-   unbounded.  Section 12 bounds them; Section 13 bounds the
-   context supplied to them; Section 14 defines their lifecycle.
 
 
 2.  Terminology
@@ -162,45 +130,6 @@ Table of Contents
 
    Demotion
       The reverse movement.  Governed by Section 5.5.  Rare.
-
-   Session
-      A bounded unit of collaborative work executed within a
-      single Claude conversation.  Has a declared type (§12.5), a
-      declared budget (§12.2), declared deliverables (§12.1), and
-      a lifecycle (§14).  Every session is either an experiment
-      (in the Section 3.3 sense) or a process session (development
-      of non-experimental artefacts such as RFCs, SOPs, or
-      infrastructure).
-
-   Session type
-      One of: development, exploration, interpretation, hand-off,
-      recovery.  Defined normatively in §12.5.
-
-   Hand-off
-      The closing artefact of a session.  A structured message
-      (template in docs/MPC-SESSION-SOP.md) enumerating the state
-      of every declared deliverable with a completion-signature
-      command (§12.4).
-
-   Completion signature
-      A deterministic command that, when executed, evaluates
-      whether a deliverable is in its green (done) state.  §12.4.
-
-   Tool-call ceiling
-      The upper bound on tool invocations a session is permitted
-      before it MUST halt.  §12.2.
-
-   Halt checkpoint
-      A session-prompt-declared point (at 50% and 80% of ceiling)
-      at which the session MUST pause and reassess.  §12.2.
-
-   Fork
-      A branch of a conversation created at a prior turn,
-      inheriting frozen context from the fork point.  §12.7.
-
-   Project knowledge base
-      The set of files present in the Claude Projects pane as
-      ambient context for every session.  §13.
 
 
 3.  The Three Layers (Normative)
@@ -492,9 +421,6 @@ Table of Contents
       docs/
          RFC-001-MPC-BRAIN.md
          RFC-002-MPC-PROJECT-STRUCTURE.md  # this document
-         RFC-003-MPC-TRACE-FORMAT-001.md
-         RFC-004-MPC-DYNAMICAL.md
-         MPC-SESSION-SOP.md                # operational companion
          MPC-VISION-001.md                 # historical, advisory
          MPC-ANATOMY-001.svg               # visual reference
          Mechanisms_of_Memory_Persistence.md
@@ -523,7 +449,7 @@ Table of Contents
    A pack implementation conforms to RFC-002 if and only if:
       (a)  All Section 3.2 and Section 4 MUST clauses hold for the
            pack's plug point.
-      (b)  It is filed under mpc_packs/<n>/ per Section 6.
+      (b)  It is filed under mpc_packs/<name>/ per Section 6.
       (c)  Its config dataclass declares all dependencies on other
            packs.
       (d)  Its test suite passes against the kernel version
@@ -533,7 +459,7 @@ Table of Contents
 
    An experiment conforms to RFC-002 if and only if:
       (a)  All Section 3.3 MUST clauses hold.
-      (b)  It is filed under experiments/<n>/ per Section 6.
+      (b)  It is filed under experiments/<name>/ per Section 6.
       (c)  Its manifest declares the kernel version and the loaded
            pack manifest.
       (d)  Its run.py executes without modification of any
@@ -547,53 +473,41 @@ Table of Contents
 
    Step 1.  One-time kernel surgery (blocking S5):
       Add the energy field to the canonical PhaseTransitionEvent
-      defined in the legacy mpc_engine_rfc001.py monolith, or
-      equivalently in the new mpc_kernel/rfc001/events.py.  Update
-      MetastableEngine.step to populate it.  This eliminates the
-      S4 shadow type.  As of Revision 2, the energy field is
-      present in mpc_kernel/rfc001/events.py.
+      defined in mpc_engine_rfc001.py.  Update MetastableEngine.step
+      to populate it.  This eliminates the S4 shadow type and is the
+      only kernel modification required by the migration.
 
    Step 2.  Directory scaffold (one-time, parallel with S5):
       Create mpc_kernel/, mpc_packs/, experiments/ per Section 6.
       Move the kernel components into mpc_kernel/rfc001/.  Existing
       session files retain their old import paths via backward-compat
       shims for one revision; a deprecation notice is added to the
-      shim.  As of Revision 2, this step is complete; the shims are
-      archived under legacy_shims_archived/.
+      shim.
 
    Step 3.  Pack carve-out (per pack, opportunistic):
       For each capability currently embedded in mpc_session2.py,
       mpc_session3.py, mpc_session4.py, file it as a pack under
-      mpc_packs/<n>/ with the structure required by Section 6.
+      mpc_packs/<name>/ with the structure required by Section 6.
       Update affected experiments to import from the pack location.
       Order is not prescribed; carve out packs as they are needed
-      by new experiments.  As of Revision 2, z3_socket,
-      metareasoner, symbolic_forebrain, decaying_substrate, and
-      persistence_substrate are filed; no further carve-out is
-      outstanding.
+      by new experiments.
 
    Step 4.  Session 5 specifically (the first session under RFC-002):
-      Rather than a mpc_session5.py monolith, S5 shipped as three
+      Rather than a mpc_session5.py monolith, S5 ships as three
       packs (z3_socket, metareasoner, symbolic_forebrain) and one
-      experiment (maze).  Complete.
+      experiment (maze).  See SESSION-5-TASK-PROMPT-v3.md.
 
    Step 5.  Ongoing:
       As biological packs from Appendix A land, they go directly
       into mpc_packs/ and are exercised by new experiments under
       experiments/.  No session adds to the kernel.
 
-   The migration is complete when ALL of the following hold:
+   The migration is complete when:
       (a)  No file under mpc_session*.py exists outside of a
            historical/ subdirectory.
-      (b)  The legacy monolith mpc_engine_rfc001.py does not exist
-           at the repo root.  If retained for historical reference,
-           it is filed under experiments/historical/ alongside the
-           session monoliths it predated.
-      (c)  Every active capability is filed under mpc_kernel/,
+      (b)  Every active capability is filed under mpc_kernel/,
            mpc_packs/, or experiments/.
-      (d)  The reference implementation referred to by this RFC is
-           mpc_kernel/ (§11), not any root-level monolith.
-      (e)  An experiment's report consists of methods and results,
+      (c)  An experiment's report consists of methods and results,
            not architectural deltas against prior sessions.
 
 
@@ -632,7 +546,7 @@ Table of Contents
      has stabilised under the kernel-candidate criteria of
      Section 5.2 and an external use case is proposed.  The MCP
      wrapper is then itself a pack-adjacent artifact under
-     mpc_packs/<n>/mcp_server.py, not a replacement for the
+     mpc_packs/<name>/mcp_server.py, not a replacement for the
      in-process pack.
 
    - An experiment MAY be exposed as an MCP tool ("run this
@@ -648,475 +562,16 @@ Table of Contents
 
    This section is non-normative.
 
-   The reference implementation as of Revision 2 is the mpc_kernel/
-   package (layout per Section 6; semver per §3.1).  Its __version__
-   string is the authoritative statement of which kernel is current.
-   Packs under mpc_packs/ and experiments under experiments/ are
-   reference pack and reference experiment implementations,
-   respectively; they are not themselves "the reference
-   implementation."
-
-   The legacy monolith mpc_engine_rfc001.py is NOT the reference
-   implementation and MUST NOT be treated as one.  It is retained
-   only for backward-reading of historical session scripts and is
-   slated for relocation to experiments/historical/ per §8 (b).  New
-   code MUST import from mpc_kernel, not from mpc_engine_rfc001.
-
-   The first session executed under RFC-002 was Session 5, which
-   introduced the maze-navigation domain and shipped the
-   z3_socket, metareasoner, and symbolic_forebrain packs.
-   Revision 2 of this RFC is itself a product of Session 6, which
-   was a process session (drafting this revision and the companion
-   SOP) rather than an experiment.
-
-
-12. Session Budget and Scope (Normative)
-
-   This section defines the bounds within which a session operates.
-   It exists because sessions, like capabilities, accrete cost when
-   unbounded.  The rules below are the project's response to the
-   Session 5 spiral, in which successive turns each believed the
-   work was "one more turn away" from completion for an extended
-   period, at non-trivial token cost.
-
-12.1  Deliverable-bounded sessions
-
-   A session MUST enumerate its deliverables as either named file
-   paths or explicit named artefacts (such as a hand-off message of
-   specified shape).  Phrases of the form "progress on X",
-   "exploration of Y", or "work toward Z" are NOT deliverables and
-   are NOT permitted in a session prompt's deliverables block.
-
-   Each deliverable is binary: it is either in its green (done)
-   state per its completion signature (§12.4), or it is not.  A
-   deliverable that is 95 percent complete is FAIL on the hand-off
-   table until it is green.
-
-   A session MUST NOT begin work on an undeclared deliverable.  If
-   a deliverable not present in the prompt becomes necessary,
-   Claude MUST surface it in the hand-off as a recommendation for
-   a subsequent session, not silently extend scope.
-
-12.2  Hard budget caps
-
-   A session prompt MUST declare a tool-call ceiling.  The ceiling
-   is an upper bound on the number of tool invocations the session
-   is permitted to make before it MUST halt and write its hand-off.
-
-   Recommended defaults by session type (§12.5):
-
-      development (single pack or single document)    40 calls
-      experiments with runs                           60 calls
-      interpretation                                  30 calls
-      exploration                                     20 calls
-      hand-off                                        50 calls
-      recovery                                        50 calls
-
-   A session prompt MAY declare a ceiling other than the default
-   for its type, but MUST state the ceiling explicitly.  An
-   undeclared ceiling is a malformed prompt (§14.0).
-
-   A session prompt MUST declare halt checkpoints at 50 percent and
-   80 percent of its ceiling.
-
-   At the 50 percent checkpoint, the session MUST pause and
-   re-scope.  If remaining budget cannot plausibly complete all
-   remaining deliverables, the session MUST drop deliverables
-   rather than attempt to fit them into insufficient budget.
-   Dropped deliverables move to the hand-off as recommendations
-   for the next session.
-
-   At the 80 percent checkpoint, the session MUST stop starting
-   new work and MUST write its hand-off.  A session that reaches
-   80 percent and continues working is in spiral behaviour and is
-   non-conformant with this section.
-
-12.3  No re-verification
-
-   A session MUST NOT re-read specifications that a prior hand-off
-   claims are verified, unless a named deliverable has produced an
-   error whose resolution specifically requires re-checking those
-   specifications.
-
-   Silent re-verification — re-reading an RFC or prior report
-   because the current session "wants to be sure" — is a budget
-   leak and is prohibited.  The frontloaded context (§13) is the
-   session's ground truth; if something in it is wrong, the
-   correct response is to stop, point to the specific line or
-   claim, and flag it in the hand-off — not to re-derive it.
-
-   This rule implies that the integrity of the project knowledge
-   base (§13) and the hand-off chain (§14) is load-bearing.  A
-   hand-off that claims a deliverable green when it is not
-   poisons every subsequent session.  See §12.6.
-
-12.4  Completion signature
-
-   A deliverable is "done" only when the hand-off contains a
-   deterministic command that, when executed, produces a green
-   result.  Examples of acceptable completion signatures:
-
-      test -f docs/RFC-002-MPC-PROJECT-STRUCTURE.md
-      wc -l docs/MPC-SESSION-SOP.md  returns >= 400
-      pytest mpc_packs/<n>/test_pack.py  passes
-      grep -q "§12" docs/RFC-002-MPC-PROJECT-STRUCTURE.md
-
-   A command that requires human judgment to evaluate ("looks
-   good", "seems reasonable") is NOT a completion signature.
-
-   Absence of a completion signature is absence of completion.
-   The phrase "no command, no done" is normative.
-
-   For deliverables that are themselves narrative content (a
-   report, a hand-off message), the completion signature is
-   typically a combination of a file-existence check and a
-   content check (word count, section heading grep) sufficient to
-   detect a truncated or empty file.
-
-12.5  Session types
-
-   This RFC enumerates exactly five session types.  Every session
-   MUST declare exactly one type in its prompt header.
-
-   development
-      Produces named code, document, or configuration deliverables
-      at specified file paths.  Budget default 40 calls.  In
-      scope: writing or editing named files; running tests against
-      named files.  Out of scope: open-ended investigation,
-      unbounded refactoring, or deliverables expressed as
-      "progress on X".
-
-   experiments-with-runs
-      A development session whose deliverables include executing
-      a workload and producing artefacts (plots, traces, reports).
-      Budget default 60 calls.  In scope: manifest construction,
-      run execution, artefact generation, report drafting.  Out of
-      scope: new kernel or pack work unless explicitly declared.
-
-   interpretation
-      Produces a written analysis of existing artefacts or
-      results.  Budget default 30 calls.  In scope: reading trace
-      data, cross-referencing RFCs, producing a report.  Out of
-      scope: running new experiments, modifying code, or expanding
-      deliverables beyond those stated.
-
-   exploration
-      Produces a short written investigation into an open
-      question, with no commitment to downstream work.  Budget
-      default 20 calls.  In scope: reading, hypothesis formation,
-      a single brief report.  Out of scope: code changes, pack
-      creation, or open-ended research across multiple topics.
-
-   hand-off
-      A session whose sole deliverable is a hand-off message (§14)
-      for a prior session that could not produce one (typically
-      because it was interrupted).  Budget default 50 calls.  In
-      scope: reading the prior session's produced state, writing
-      the hand-off.  Out of scope: continuing or extending the
-      prior session's work.
-
-   recovery
-      Produces a corrected session prompt that replaces a failed
-      prior prompt.  Budget default 50 calls.  See §12.6.  In
-      scope: diagnosing why the prior hand-off was not green and
-      producing a prompt that will be green.  Out of scope:
-      executing the failed session's original work.
-
-   A session prompt MAY propose a type not in the above list, but
-   in doing so it is proposing an RFC-002 revision, not a session.
-
-12.6  Premature termination protocol
-
-   When a session terminates before its deliverables are green —
-   whether because of budget exhaustion, context window overflow,
-   user interruption, loss of connection, or an explicit halt at
-   the 80 percent checkpoint — the next session MUST be a
-   recovery session (§12.5).
-
-   A recovery session's sole deliverable is a corrected
-   development-session prompt that replaces the failed one.  A
-   recovery session does NOT execute the failed session's work.
-
-   The purpose of this protocol is to prevent the next development
-   session from inheriting a hand-off that falsely claims green
-   state.  A recovery session forces explicit diagnosis of why
-   the prior hand-off was not green, and produces a prompt whose
-   deliverables, budget, and context have been corrected against
-   that diagnosis.
-
-   A hand-off that claims green state for a deliverable whose
-   completion signature does not run green, when executed, is a
-   lying hand-off.  A lying hand-off is a §12.3 violation and
-   requires a recovery session even if the next session was
-   already planned as something else.
-
-12.7  Conversation forking
-
-   The Claude.ai interface permits forking a conversation at a
-   prior turn.  A fork creates a new branch inheriting the parent's
-   frontloaded context, frozen at the fork point.  Attached files
-   are not refreshed; the fork reads the attachments as they stood
-   at fork time.
-
-   Forking is permitted as a checkpoint mechanism within a session.
-
-   A recovery session (§12.6) MUST NOT be performed by forking a
-   failed session.  Recovery MUST be a fresh session, with current
-   attachments, so that it does not inherit the context that
-   produced the failure.
-
-   Forks more than one level deep (a fork-of-a-fork) are
-   prohibited.  If a second fork feels necessary, the correct
-   response is to start a fresh session rather than fork again.
-
-   A fork inherits the budget state of the parent at fork time.
-   The child's halt checkpoints are computed against the same
-   ceiling as the parent, not against a fresh ceiling.  A fork
-   taken at 30 calls of a 50-call parent has 10 calls remaining
-   before its 80 percent checkpoint, not 40.
-
-   Operational guidance on when forking is appropriate versus when
-   a fresh session is appropriate is maintained in
-   docs/MPC-SESSION-SOP.md (informational).
-
-
-13. Project Knowledge Base Files (Normative)
-
-   This section governs the contents of the Claude Projects pane —
-   the ambient context supplied to every session — not the contents
-   of the repository on disk.  The two are distinct.  A file MAY
-   exist on disk without being in the project pane, and some files
-   (session reports older than the most recent) MUST NOT be in the
-   project pane even though they remain on disk under
-   experiments/historical/.
-
-   The purpose of this section is to bound the ambient context.
-   Unbounded project panes produce three failure modes: (1) session
-   prompts become unreadable because their frontloaded context
-   swamps the actual task; (2) Claude re-reads stale material in
-   violation of §12.3; (3) context-window budget is consumed
-   before the session begins.
-
-13.1  MUST include
-
-   The project pane MUST contain exactly the following files:
-
-      docs/RFC-001-MPC-BRAIN.md
-      docs/RFC-002-MPC-PROJECT-STRUCTURE.md
-      docs/RFC-003-MPC-TRACE-FORMAT-001.md
-      docs/RFC-004-MPC-DYNAMICAL.md
-      README.md
-      dev_profile.json                       (most recent)
-      docs/MPC-SESSION-SOP.md
-      docs/<foundational-paper>.md           (currently driving development)
-      experiments/historical/SESSION-<N>-REPORT.md  (exactly one;
-                                             the most recent)
-
-   "The foundational paper currently driving development" is
-   whichever of the project's foundational documents (e.g.,
-   Mechanisms_of_Memory_Persistence.md,
-   v3_On_the_Dynamical_Limits...md, or a successor) is the source
-   of the next session's intended work.  At any given time there
-   is exactly one such paper.  When the active paper changes, the
-   outgoing paper is removed from the pane and the incoming paper
-   is added; both are not present simultaneously.
-
-   Target total size: under 200 KB of text.  If the §13.1 set
-   exceeds 200 KB, the foundational paper MUST be replaced with a
-   short extract (a "driving excerpt") produced by an
-   interpretation-type session (§12.5); the full paper remains on
-   disk but not in the pane.
-
-13.2  MUST NOT include
-
-   The project pane MUST NOT contain any of the following:
-
-      (a)  Image files (PNG, JPG, SVG).  Visuals are artefacts of
-           specific experiments or are reference material for
-           specific deliverables; they belong with their experiment
-           or are loaded on request per §1/§2 of the session
-           prompt.
-      (b)  Historical session scripts (mpc_session*.py,
-           mpc_engine_rfc001.py).  These live under
-           experiments/historical/.
-      (c)  Superseded monoliths or superseded RFC revisions.
-      (d)  More than one session report.  Only the most recent
-           belongs in the pane; older reports are accessed on
-           request per §2 of the session prompt.
-      (e)  Research notes not driving the current session's
-           foundational paper.  Notes such as "effector notes",
-           "symbolic forebrain architectural notes", or
-           "recursive substrate–limit pairing" are accessed on
-           request, not by default.
-      (f)  Code files that exist in the repository under
-           mpc_kernel/ or mpc_packs/.  Claude loads these from
-           disk when needed; they do not belong in the pane.
-      (g)  Session prompts themselves, past or present.  The
-           current session's prompt is supplied as the user
-           message, not as a pane attachment.
-
-13.3  Refresh rule
-
-   The following refresh rule is mechanical and requires no
-   judgment calls.  After every session's hand-off is accepted:
-
-      (1)  README.md — refreshed if and only if the session
-           modified it on disk.  Update the pane copy in that
-           case; otherwise leave.
-
-      (2)  dev_profile.json — regenerated after every session
-           that touches files on disk.  The pane copy is replaced
-           with the fresh generation.  Script: whatever the
-           project provides (see README).
-
-      (3)  RFC-001 through RFC-004 — refreshed if and only if
-           the session produced a revision of that RFC.
-
-      (4)  docs/MPC-SESSION-SOP.md — refreshed if and only if
-           the session modified it on disk.
-
-      (5)  Session report — the newest
-           experiments/historical/SESSION-<N>-REPORT.md replaces
-           the prior one.  The prior session's report remains on
-           disk under experiments/historical/ but leaves the pane.
-
-      (6)  Foundational paper — changed only when the next
-           session's work is grounded in a different foundational
-           document than the current one, as declared in the
-           session prompt.  Changed by removing the outgoing
-           paper from the pane and adding the incoming one; both
-           are never present simultaneously.
-
-   Ron is responsible for executing this refresh.  The outgoing
-   Claude's hand-off MUST include a "pane refresh" line that
-   enumerates which of (1)–(6) above need action after this
-   session.  If none do, the hand-off states "pane refresh: none."
-
-
-14. Session Lifecycle (Normative)
-
-   This section defines the phases of a session from pre-flight
-   through hand-off.  It absorbs the content of the prior
-   SOP_Session_Hand-Off document; that document is retired by
-   this revision and MUST be removed from the repository (see §8
-   (b) for similar legacy relocation).
-
-   Operational templates and worked examples for each phase live
-   in docs/MPC-SESSION-SOP.md.  That document is informational;
-   this section is normative.  When the two disagree, this
-   section wins.
-
-14.0  Phase 0 — pre-flight
-
-   Before executing any session work, Claude MUST verify that the
-   session prompt declares:
-
-      (a)  A session type (one of §12.5).
-      (b)  A tool-call ceiling (§12.2).
-      (c)  A list of deliverables as named file paths or named
-           artefacts (§12.1).
-      (d)  Halt checkpoints at 50 percent and 80 percent of the
-           ceiling (§12.2).
-      (e)  A frontloaded context list (§13) and a backloaded
-           context list.
-
-   A session prompt missing any of (a)–(e) is malformed.  Claude
-   MUST NOT begin work on a malformed prompt.  The correct
-   response to a malformed prompt is a short message identifying
-   what is missing and requesting that Ron supply it.
-
-   A session prompt MAY omit (e) if the frontloaded and
-   backloaded lists match exactly the §13.1 defaults; in that
-   case the prompt states "frontloaded: §13.1 defaults;
-   backloaded: standard" and the session proceeds.
-
-14.1  Phase 1 — code demotion and archival
-
-   Before cataloguing new work, the workspace MUST be cleared of
-   legacy or deprecated code.  Silent deletions are prohibited.
-
-      (a)  Archive monolithic scripts.  Any lingering single-file
-           session scripts (mpc_session*.py, mpc_engine_rfc001.py)
-           MUST be moved into experiments/historical/ if they
-           survive the session.
-      (b)  Relocate demoted packs.  If a pack was replaced or
-           retired during the session, its folder MUST be moved to
-           mpc_packs/deprecated/ and MUST remain there for at
-           least one RFC-002 revision (§5.5).
-      (c)  Update deprecation notes.  A deprecation note MUST be
-           added to the README.md of any demoted pack, stating
-           the reason and the replacement.
-
-14.2  Phase 2 — pack extraction
-
-   Any inline session code that provided a reusable capability
-   MUST be extracted into a standalone pack, subject to the
-   prototype-to-pack promotion criteria of §5.1.
-
-      (a)  Identify promotable code.  Locate any prototype code
-           that was used end-to-end and interacts with the kernel
-           exclusively through one of the three plug points (§4).
-      (b)  Create pack directory.  Create a new folder at
-           mpc_packs/<pack_name>/.
-      (c)  Scaffold required files.  The new directory MUST
-           contain exactly: __init__.py, pack.py, config.py
-           (with declared dependencies on other packs),
-           test_pack.py (exercising attach -> use -> detach),
-           README.md (interfaces, dependencies, status).
-      (d)  Verify namespace isolation.  The pack MUST define its
-           own event types and data structures; it MUST NOT
-           modify or shadow kernel types (§3.2, §4.4).
-
-14.3  Phase 3 — experiment containerization
-
-   The session's experiment, if any, MUST be cleanly boxed.
-
-      (a)  Create experiment directory.  Create a new folder at
-           experiments/<experiment_name>/.
-      (b)  Isolate execution logic.  The session's driver code
-           (e.g., a maze generator, a specific test runner) MUST
-           be moved into experiments/<experiment_name>/run.py.
-      (c)  Generate manifest.  Create
-           experiments/<experiment_name>/manifest.py, explicitly
-           declaring:
-              - the kernel version required;
-              - the complete list of packs loaded, with their
-                configurations.
-      (d)  Write the report.  Draft
-           experiments/<experiment_name>/report.md, including:
-              - final results table;
-              - per-component sections;
-              - RFC-001 invariant checklist;
-              - list of artefacts generated;
-              - outstanding issues and open items.
-      (e)  Store artefacts.  All output plots (*.png), traces
-           (*.json), and logs MUST be moved into
-           experiments/<experiment_name>/artifacts/.
-
-   A process session (one producing RFCs, SOPs, or infrastructure
-   rather than an experiment, such as Session 6) omits Phase 3.
-
-14.4  Phase 4 — prepare the next session
-
-   With the previous session cleanly archived and componentized,
-   the starting state for the next experiment is initialised.
-
-      (a)  Lock kernel version.  Declare the exact semantic
-           version (MAJOR.MINOR.PATCH) of the kernel that will be
-           used for the next session.
-      (b)  Establish target manifest.  Define the baseline packs
-           required.  Unless disabled, this defaults to the
-           standard manifest per §5.4 (JAXSubstrate, AutoCluster,
-           Effector, Calorimeter).
-      (c)  Define the domain or workload.  Document the specific
-           task, workload, or problem domain the next session is
-           meant to solve before writing new execution code.
-      (d)  Emit the pane refresh line.  Per §13.3, enumerate
-           which pane files need action after this session.
-      (e)  Emit the next session's prompt skeleton.  A hand-off
-           MUST include a recommendation for the next session's
-           type, budget, and deliverables, in a form Ron can
-           copy and flesh out.
+   The reference implementation as of this RFC's date is the existing
+   codebase at /mnt/project/, comprising mpc_engine_rfc001.py,
+   mpc_session2.py, mpc_session3.py, mpc_session4.py, and
+   mpc_lattice.py.  The migration plan in Section 8 describes how
+   that codebase reaches RFC-002 conformance.
+
+   The first session executed under RFC-002 is Session 5, governed
+   by SESSION-5-TASK-PROMPT-v3.md.  Session 5 is also the first
+   session that introduces a domain (maze navigation) intended to
+   exercise the cognitive-mapping claims of RFC-001.
 
 
 Appendix A.  Pack roadmap (informational)
