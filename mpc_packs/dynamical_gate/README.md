@@ -58,26 +58,38 @@ back above the band.
 
 ## API
 
+The integrated path is `DynamicalEngine` — a `MetastableEngine`
+subclass that carries a gate + observables pair and populates
+`PhaseTransitionEvent.fdr_slope` automatically:
+
 ```python
-from mpc_packs.dynamical_gate import DynamicalGate, release_and_classify
+from mpc_kernel.rfc001.substrate import Substrate
+from mpc_kernel.rfc001.bus import EventBus
+from mpc_packs.dynamical_gate import (
+    DynamicalEngine, DynamicalGate, StreamingObservables,
+)
 
-gate = DynamicalGate(window=500, tau_floor=0.05, dt=0.01,
-                    recompute_interval=100, burn_frac=0.2)
+sub = Substrate(dim=2)
+sub.register("pA", V_A_fn, lam=20.0)
+bus = EventBus()
 
+gate = DynamicalGate(window=500, tau_floor=0.05, recompute_interval=100)
+obs = StreamingObservables(V_A_fn=V_A_fn, window=500,
+                          bath_trajectory=precomputed_bath)
+
+eng = DynamicalEngine(
+    substrate=sub, bus=bus,
+    gate=gate, observables=obs, V_obs=V_A_fn, h_mag=0.05,
+    cluster_id="engine-1",
+)
 for _ in range(n_steps):
-    v = engine.step()
-    gate.observe(v, energy_fn=substrate.energy)
-    if gate.should_release():
-        # Expensive path: measure_fdr + classify_phase_dynamical.
-        # Produces an FDRRelease with .fdr_slope and .phase.
-        release = release_and_classify(
-            v, U=substrate.energy, V_obs=chosen_observable,
-            tau_A=streaming_tau_A, tau_env=streaming_tau_env,
-            gamma_A=streaming_gamma_A,
-        )
-        # Populate PhaseTransitionEvent emitted by the engine next step.
-        pending_fdr_slope = release.fdr_slope
+    eng.step()  # emits PhaseTransitionEvents with fdr_slope populated
+                # on edge fire (~1 per basin entry).
 ```
+
+The lower-level pieces (`DynamicalGate`, `StreamingObservables`,
+`release_and_classify`) are still exported for callers that want to
+compose them manually.
 
 `observe()` is O(1) per step (one energy eval + deque append).
 The τ recompute runs every `recompute_interval` steps and is
@@ -167,21 +179,23 @@ Four-scenario calibration takes ~6–10 s; skip with
 
 ## End-to-end verification
 
-The pack's `test_pack.py` runs the full chain on the committed
+The pack's `test_pack.py` runs two integration tests on the committed
 scenario:
 
-1. Gate observes a 1500-step Langevin trajectory.
-2. Gate trips at step ~499 (`tau_E ≈ 0.015`, below floor).
-3. `release_and_classify` fires at the trip position using streaming
-   `tau_A`, `tau_env`, `gamma_A` computed from the gate's buffer.
-4. FDR slope comes out to **+0.959** — matches Session-A reference
-   (+0.96) to two decimals.
-5. `classify_phase_dynamical` returns `Phase.C`.
-6. `PhaseTransitionEvent(fdr_slope=+0.959, to_phase=Phase.C)` is
-   constructed cleanly.
+**`test_end_to_end_committed_wire`** — manual composition. Gate
+trips, `release_and_classify` produces slope **+0.959** (Session-A
+reference +0.96) and `Phase.C`, `PhaseTransitionEvent` is constructed
+cleanly with `fdr_slope` populated.
 
-The end-to-end test is asserted, not just demonstrated:
-`abs(slope − 0.96) < 0.02` and `phase == Phase.C`.
+**`test_dynamical_engine_populates_fdr_slope`** — `DynamicalEngine`
+attached to a kernel substrate, 800 steps. Exactly one gate edge-fire,
+cached slope **+0.959**, 68 PhaseTransitionEvents emitted (many
+C↔S↔K oscillations under thermal noise). Of those, 50 carry the
+cached `fdr_slope`; the 18 earlier events (before the gate had fired)
+carry `fdr_slope=None` — correct semantics, no dynamical measurement
+exists until the gate fires.
+
+Both tests assert `abs(slope − 0.96) < 0.02`.
 
 ## Open
 
@@ -190,7 +204,10 @@ The end-to-end test is asserted, not just demonstrated:
    streaming τ buffer. Per-proposition violations V_A or PCA-projected
    coordinates may give cleaner signal in multi-proposition
    experiments.
-2. **Engine integration.** A Governor-style pack that attaches a
-   `DynamicalGate` + `StreamingObservables` pair to each engine and
-   populates outgoing `PhaseTransitionEvent.fdr_slope` at release time
-   is the remaining wiring step. The primitives are all in place.
+2. **Asynchronous release.** The gate's edge-fire runs `measure_fdr`
+   synchronously inside `step()`, stalling the engine for ~8 s. With
+   edge-triggering there is typically one stall per basin entry, which
+   is fine for short experiments and for the ones we have now. For
+   long-running experiments this should move to a worker thread: the
+   engine caches the previous slope while the new measurement runs in
+   the background, and the cached value flips when the worker returns.

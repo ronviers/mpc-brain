@@ -7,11 +7,13 @@ enters the pinned regime where trajectory observables cannot separate C
 from K and FDR is load-bearing.
 """
 
+from .engine import DynamicalEngine
 from .observables import StreamingObservables
 from .pack import DynamicalGate
 from .release import FDRRelease, release_and_classify, release_fdr_slope
 
 __all__ = [
+    "DynamicalEngine",
     "DynamicalGate",
     "FDRRelease",
     "StreamingObservables",

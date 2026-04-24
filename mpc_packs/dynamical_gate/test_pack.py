@@ -14,9 +14,12 @@ import os
 
 import numpy as np
 
+from mpc_kernel.rfc001.bus import EventBus
 from mpc_kernel.rfc001.events import PhaseTransitionEvent
 from mpc_kernel.rfc001.phase import Phase
+from mpc_kernel.rfc001.substrate import Substrate
 from mpc_packs.dynamical_gate.config import DynamicalGateConfig
+from mpc_packs.dynamical_gate.engine import DynamicalEngine
 from mpc_packs.dynamical_gate.observables import StreamingObservables
 from mpc_packs.dynamical_gate.pack import DynamicalGate
 from mpc_packs.dynamical_gate.release import release_and_classify
@@ -230,6 +233,70 @@ def test_end_to_end_committed_wire():
     return release, evt
 
 
+def test_dynamical_engine_populates_fdr_slope():
+    """Construct a `DynamicalEngine` on a committed-scenario substrate;
+    let it run long enough for the gate to edge-fire once; verify
+    that PhaseTransitionEvents emitted AFTER the release carry a
+    populated `fdr_slope` matching the Session-A reference.
+
+    Pre-release events (before the gate has fired) have fdr_slope=None,
+    which is correct: no dynamical measurement exists yet.
+    """
+    # Build a committed-scenario substrate via the kernel's register API.
+    sub = Substrate(dim=2, E_c=0.50, E_s=2.00)
+    sub.register("pA", lambda v: (np.linalg.norm(v - _A) - 1.2) ** 2, lam=20.0)
+    sub.register("pB", lambda v: (np.linalg.norm(v - _B) - 1.0) ** 2, lam=20.0)
+
+    # Bath reference for tau_env.
+    U_bath = lambda v: 0.15 * np.sum((v - _MID) ** 2)
+    bath = run_langevin(U_bath, _MID, 500, rng=np.random.default_rng(42))
+
+    V_A = lambda v: (np.linalg.norm(v - _A) - 1.2) ** 2
+
+    gate = DynamicalGate(window=300, tau_floor=0.05, recompute_interval=100)
+    obs = StreamingObservables(V_A_fn=V_A, window=300, bath_trajectory=bath)
+
+    bus = EventBus()
+    events: list[PhaseTransitionEvent] = []
+    bus.subscribe(PhaseTransitionEvent, lambda e: events.append(e))
+
+    eng = DynamicalEngine(
+        substrate=sub, bus=bus,
+        gate=gate, observables=obs, V_obs=V_A, h_mag=0.05,
+        E_star=5.0, cluster_id="dynamical-committed",
+    )
+    eng.v = np.array([1.11, 0.456])  # start at intersection (committed minimum)
+
+    np.random.seed(2026)
+    for _ in range(800):
+        eng.step()
+
+    # The gate should fire exactly once (edge-triggered, stays pinned).
+    assert eng.release_count == 1, (
+        f"expected exactly one gate release in pinned committed, got "
+        f"{eng.release_count}"
+    )
+
+    # Cached slope matches the Session-A committed reference (+0.96) to
+    # two decimals — same wiring, same measure_fdr, same potentials.
+    assert eng.cached_fdr_slope is not None
+    assert abs(eng.cached_fdr_slope - 0.96) < 0.02, (
+        f"cached slope drifted from Session-A committed reference +0.96: "
+        f"got {eng.cached_fdr_slope:+.3f}"
+    )
+
+    # Of the events emitted, the ones after the first release must carry
+    # fdr_slope. The ones before must have fdr_slope=None.
+    slopes_populated = [e for e in events if e.fdr_slope is not None]
+    slopes_none = [e for e in events if e.fdr_slope is None]
+    assert len(slopes_populated) > 0, "no events emitted after release"
+    assert all(
+        abs(e.fdr_slope - eng.cached_fdr_slope) < 1e-9 for e in slopes_populated
+    ), "all post-release events should carry the cached slope"
+
+    return eng, events, len(slopes_populated), len(slopes_none)
+
+
 if __name__ == "__main__":
     print("dynamical_gate pack — sanity tests")
     print("=" * 62)
@@ -257,5 +324,12 @@ if __name__ == "__main__":
         print(f"    event: from={evt.from_phase.name} "
               f"to={evt.to_phase.name}  "
               f"fdr_slope={evt.fdr_slope:+.3f}")
+
+        eng, events, n_pop, n_none = test_dynamical_engine_populates_fdr_slope()
+        print(f"[5] DynamicalEngine integration")
+        print(f"    release_count={eng.release_count}  "
+              f"cached_slope={eng.cached_fdr_slope:+.3f}  "
+              f"events={len(events)}  "
+              f"with_slope={n_pop}  none={n_none}")
 
     print("\nAll tests pass.")
