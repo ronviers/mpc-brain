@@ -55,6 +55,35 @@ def test_gate_signal_directions():
     assert gate_signal(np.zeros(2), a, 0.3) is False             # zero-mag
 
 
+def test_gate_warmup_and_trip():
+    """Smooth descent toward a harmonic minimum: no trips once the window
+    fills. Abrupt direction reversal: one trip immediately after."""
+    grad = lambda v: v.copy()                           # U = |v|^2 / 2
+    gate = DynamicalGate(dim=2, window=10, threshold=0.3)
+
+    # Warm-up phase: first 9 observations buffer only, no gate signal.
+    v = np.array([1.0, 0.0])
+    for _ in range(9):
+        gate.observe(v, grad, gamma=1.0, dt=0.01)
+        v = v - v * 0.01                                # deterministic drift
+    assert gate.trip_count == 0, "no trips during warm-up"
+
+    # 10th observation + more smooth descent: ghost and tail both point
+    # toward origin → aligned → no trips.
+    for _ in range(20):
+        gate.observe(v, grad, gamma=1.0, dt=0.01)
+        v = v - v * 0.01
+    assert gate.trip_count == 0, f"smooth descent tripped: {gate.trip_count}"
+
+    # Flip direction sharply: now the tail says "leftward", ghost still
+    # says "rightward toward origin" (v is positive-x). Anti-alignment
+    # → trip.
+    v_flip = np.array([-1.0, 0.0])
+    gate.observe(v_flip, grad, gamma=1.0, dt=0.01)
+    assert gate.should_release(), "direction flip should trip"
+    assert gate.trip_count == 1
+
+
 if __name__ == "__main__":
     print("dynamical_gate pack — sanity tests")
     print("=" * 62)
@@ -68,4 +97,7 @@ if __name__ == "__main__":
     test_gate_signal_directions()
     print(f"[3] gate_signal direction     aligned/orthogonal/anti   OK")
 
-    print("\nPrimitive sanity tests pass.")
+    test_gate_warmup_and_trip()
+    print(f"[4] DynamicalGate warmup+trip smooth descent quiet, flip trips   OK")
+
+    print("\nPrimitive + orchestrator sanity tests pass.")

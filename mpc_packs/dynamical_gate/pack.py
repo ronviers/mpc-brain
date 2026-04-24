@@ -91,8 +91,10 @@ class DynamicalGate:
         self.window = window
         self.threshold = threshold
         self._buffer: Deque[np.ndarray] = deque(maxlen=window)
-        self._last_trip: Optional[int] = None
         self._step: int = 0
+        self._trip_count: int = 0
+        self._last_trip_step: Optional[int] = None
+        self._tripped: bool = False
 
     def observe(
         self,
@@ -101,14 +103,35 @@ class DynamicalGate:
         gamma: float,
         dt: float,
     ) -> None:
-        """Push a new position and update the internal gate state."""
-        raise NotImplementedError("Session 7 step 1: implement observe.")
+        """Push a new position and update the internal gate state.
+
+        No-op on the first `window − 1` observations (buffer not yet full).
+        """
+        self._step += 1
+        self._buffer.append(np.asarray(v, dtype=float).copy())
+        self._tripped = False
+        if len(self._buffer) < self.window:
+            return
+        v_cur = self._buffer[-1]
+        v_past = self._buffer[0]
+        ghost = compute_ghost(v_cur, grad_fn, gamma, dt)
+        ghost_delta = ghost - v_cur
+        tail_delta = v_cur - v_past
+        if gate_signal(ghost_delta, tail_delta, self.threshold):
+            self._tripped = True
+            self._trip_count += 1
+            self._last_trip_step = self._step
 
     def should_release(self) -> bool:
         """True when the most recent observation tripped the gate."""
-        raise NotImplementedError("Session 7 step 1: implement should_release.")
+        return self._tripped
 
     @property
     def trip_count(self) -> int:
         """Total trips since construction. For calibration tests."""
-        raise NotImplementedError("Session 7 step 1: implement trip_count.")
+        return self._trip_count
+
+    @property
+    def last_trip_step(self) -> Optional[int]:
+        """Step index of the most recent trip, or None if never tripped."""
+        return self._last_trip_step
