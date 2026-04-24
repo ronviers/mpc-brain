@@ -269,179 +269,21 @@ class LateralCluster(AutoCluster):
 
 # =============================================================================
 #  TASK 3 — AMEND-004: ObservationSocket
+#
+#  Canonical definitions now live in mpc_packs.observation_socket (carved
+#  Session 9). Re-exported here so Session-3-era callers keep resolving.
 # =============================================================================
 
-@dataclass
-class ConstraintSpec:
-    """Structured constraint specification produced by ObservationSocket."""
-    fn:       Callable[[np.ndarray], float]
-    lambda_:  float
-    label:    str
-    modality: str
+from mpc_packs.observation_socket.pack import (  # noqa: E402,F401
+    ConstraintSpec,
+    ObservationSocket,
+)
 
 
-class ObservationSocket:
-    """Abstract base for AMEND-004 ObservationSocket."""
-
-    def observe(
-        self, proposition: str, modality: str = "text", strength: float = 1.0
-    ) -> ConstraintSpec:
-        raise NotImplementedError
-
-    def flush(self) -> List[ConstraintSpec]:
-        raise NotImplementedError
-
-    def connect(self, model_endpoint=None, **kwargs):
-        raise NotImplementedError
-
-    def register_fallback(self, modality: str, encoder: Callable):
-        raise NotImplementedError
-
-
-class AnthropicSocket(ObservationSocket):
-    """
-    AMEND-004: ObservationSocket backed by claude-sonnet-4-6.
-
-    Architecture constraint: holds neither Substrate nor Bus.
-
-    connect():
-        Reads api_key from kwargs or ANTHROPIC_API_KEY env.
-        Sets _connected=True on success; False on failure (no raise).
-
-    observe():
-        Connected → calls API; encodes proposition as fn: R^dim → R+.
-        Not connected or API failure → registered fallback encoder.
-        Returns ConstraintSpec immediately (synchronous).
-        lambda_ = strength · 1.0.
-
-    flush():
-        Returns list(_buffer) and clears buffer.  Always immediate.
-    """
-
-    _SYSTEM_TEMPLATE = LLMConstraintEncoder._SYSTEM_TEMPLATE
-
-    def __init__(self, dim: int):
-        self.dim         = dim
-        self._connected  = False
-        self._client     = None
-        self._buffer:    List[ConstraintSpec] = []
-        self._fallback:  Dict[str, Callable] = {}
-        # Default text fallback: word-hash quadratic (same as LLMConstraintEncoder)
-        self.register_fallback("text", self._default_text_fallback)
-
-    # ── ObservationSocket interface ───────────────────────────────────────────
-
-    def connect(self, model_endpoint=None, **kwargs):
-        api_key = kwargs.get("api_key", "") or os.environ.get("ANTHROPIC_API_KEY", "")
-        if api_key and _ANTHROPIC_LIB:
-            try:
-                self._client    = _anthropic_mod.Anthropic(api_key=api_key)
-                self._connected = True
-                log.info("AnthropicSocket: connected to Anthropic API")
-            except Exception as exc:
-                log.warning(f"AnthropicSocket.connect failed: {exc}")
-                self._connected = False
-        else:
-            self._connected = False
-
-    def observe(
-        self, proposition: str, modality: str = "text", strength: float = 1.0
-    ) -> ConstraintSpec:
-        """
-        Encode proposition → ConstraintSpec.
-        Primary: Anthropic API.  Fallback: registered encoder for modality.
-        lambda_ = strength · 1.0.
-        """
-        fn: Optional[Callable] = None
-
-        if self._connected:
-            fn = self._encode_via_api(proposition)
-
-        if fn is None:
-            enc = self._fallback.get(modality) or self._fallback.get("text")
-            if enc is not None:
-                try:
-                    fn = enc(proposition, self.dim)
-                except Exception as exc:
-                    log.warning(f"Fallback encoder failed: {exc}")
-
-        if fn is None:
-            fn = _make_quadratic_constraint(np.zeros(self.dim))
-
-        # Label: first 48 chars, spaces → underscores
-        label = proposition[:48].strip().replace(" ", "_").replace("'", "")
-        spec  = ConstraintSpec(
-            fn=fn, lambda_=float(strength), label=label, modality=modality
-        )
-        self._buffer.append(spec)
-        return spec
-
-    def flush(self) -> List[ConstraintSpec]:
-        """Return buffered specs and clear.  Always immediate."""
-        specs = list(self._buffer)
-        self._buffer.clear()
-        return specs
-
-    def register_fallback(self, modality: str, encoder: Callable):
-        """encoder: (proposition: str, dim: int) → Callable[[np.ndarray], float]"""
-        self._fallback[modality] = encoder
-
-    # ── Internal helpers ──────────────────────────────────────────────────────
-
-    def _encode_via_api(self, proposition: str) -> Optional[Callable]:
-        system = self._SYSTEM_TEMPLATE.replace("{dim}", str(self.dim))
-        try:
-            resp = self._client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=512,
-                system=system,
-                messages=[{"role": "user", "content": proposition}],
-            )
-            code = resp.content[0].text.strip()
-            fn   = self._safe_eval(code)
-            if fn is not None:
-                v0 = np.zeros(self.dim)
-                assert float(np.asarray(fn(v0))) >= 0
-                return fn
-        except Exception as exc:
-            log.warning(f"AnthropicSocket API encode failed: {exc}")
-        return None
-
-    def _safe_eval(self, code: str) -> Optional[Callable]:
-        if "```" in code:
-            code = "\n".join(
-                ln for ln in code.splitlines()
-                if not ln.strip().startswith("```")
-            )
-        ns = {"np": np, "__builtins__": {}}
-        try:
-            exec(code, ns)  # noqa: S102
-            fn = ns.get("fn")
-            return fn if callable(fn) else None
-        except Exception as exc:
-            log.warning(f"AnthropicSocket safe_eval failed: {exc}")
-            return None
-
-    @staticmethod
-    def _default_text_fallback(proposition: str, dim: int) -> Callable:
-        """
-        Deterministic word-hash quadratic encoder.
-        Same algorithm as LLMConstraintEncoder._word_hash_center().
-        """
-        words = proposition.lower().split()
-        if not words:
-            return _make_quadratic_constraint(np.zeros(dim))
-        vecs = []
-        for word in words:
-            seed = int(hashlib.md5(word.encode()).hexdigest()[:8], 16) % (2 ** 31)
-            rng  = np.random.default_rng(seed)
-            vec  = rng.standard_normal(dim)
-            vec /= np.linalg.norm(vec) + 1e-9
-            vecs.append(vec)
-        center = np.mean(vecs, axis=0)
-        norm   = np.linalg.norm(center)
-        center = center / norm if norm > 1e-9 else center
-        return _make_quadratic_constraint(center)
+# AnthropicSocket canonical definition lives in
+# mpc_packs.observation_socket (carved Session 9). Re-exported here
+# so Session-3-era callers resolve the same class object.
+from mpc_packs.observation_socket.pack import AnthropicSocket  # noqa: E402,F401
 
 
 # =============================================================================
