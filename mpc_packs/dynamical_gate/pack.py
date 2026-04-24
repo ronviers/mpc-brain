@@ -51,17 +51,27 @@ def gate_signal(
     v_ghost_delta: np.ndarray,
     v_tail_delta: np.ndarray,
     threshold: float,
+    min_tail_mag: float = 0.0,
 ) -> bool:
     """Trip when the linear-ghost and trajectory-tail disagree in direction.
 
-    Both arguments are displacement vectors (ghost − v and tail). The signal
-    is the cosine distance `1 − cos(θ)`: 0 when perfectly aligned, 1 when
-    orthogonal, 2 when anti-aligned. Returns True when the distance exceeds
-    `threshold`. Zero-magnitude inputs return False (no information).
+    Both arguments are displacement vectors per unit time (ghost is a
+    one-step drift, tail is the mean per-step displacement over the window).
+    The signal is the cosine distance `1 − cos(θ)`: 0 when aligned, 1 when
+    orthogonal, 2 when anti-aligned. Returns True when that distance
+    exceeds `threshold`.
+
+    `min_tail_mag` suppresses the gate whenever the tail's mean per-step
+    displacement falls below that magnitude: direction comparisons on sub-
+    thermal motion are pure noise and the gate would fire every step.
+    Calibrate against the substrate's thermal displacement scale,
+    `sqrt(2·D_eff·dt)`. Set to 0 for the raw geometric signal.
     """
     ng = float(np.linalg.norm(v_ghost_delta))
     nt = float(np.linalg.norm(v_tail_delta))
     if ng < 1e-12 or nt < 1e-12:
+        return False
+    if nt < min_tail_mag:
         return False
     cos_sim = float(np.dot(v_ghost_delta, v_tail_delta) / (ng * nt))
     return (1.0 - cos_sim) > threshold
@@ -86,10 +96,17 @@ class DynamicalGate:
                 ...
     """
 
-    def __init__(self, dim: int, window: int = 50, threshold: float = 0.3):
+    def __init__(
+        self,
+        dim: int,
+        window: int = 50,
+        threshold: float = 0.3,
+        min_tail_mag: float = 0.0,
+    ):
         self.dim = dim
         self.window = window
         self.threshold = threshold
+        self.min_tail_mag = min_tail_mag
         self._buffer: Deque[np.ndarray] = deque(maxlen=window)
         self._step: int = 0
         self._trip_count: int = 0
@@ -116,8 +133,10 @@ class DynamicalGate:
         v_past = self._buffer[0]
         ghost = compute_ghost(v_cur, grad_fn, gamma, dt)
         ghost_delta = ghost - v_cur
-        tail_delta = v_cur - v_past
-        if gate_signal(ghost_delta, tail_delta, self.threshold):
+        # Normalise the tail to a per-step displacement so it compares to
+        # the per-step ghost on the same time scale.
+        tail_per_step = (v_cur - v_past) / self.window
+        if gate_signal(ghost_delta, tail_per_step, self.threshold, self.min_tail_mag):
             self._tripped = True
             self._trip_count += 1
             self._last_trip_step = self._step

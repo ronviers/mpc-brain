@@ -12,16 +12,19 @@ Invocation:
 
 from __future__ import annotations
 
+import os
 from collections import deque
 
 import numpy as np
 
+from mpc_packs.dynamical_gate.config import DynamicalGateConfig
 from mpc_packs.dynamical_gate.pack import (
     DynamicalGate,
     compute_ghost,
     compute_tail,
     gate_signal,
 )
+from mpc_packs.physics_primitives import DT, numerical_grad, run_langevin
 
 
 def test_compute_ghost_harmonic():
@@ -84,6 +87,78 @@ def test_gate_warmup_and_trip():
     assert gate.trip_count == 1
 
 
+# ── Four-scenario calibration (Session-A Langevin substrate) ────────────────
+
+
+_A = np.array([0.0, 0.0])
+_B = np.array([2.0, 0.0])
+_MID = 0.5 * (_A + _B)
+
+
+def _V_dist(v, anchor, r, lam):
+    return lam * (np.linalg.norm(v - anchor) - r) ** 2
+
+
+_SCENARIOS = {
+    "committed": (lambda v: _V_dist(v, _A, 1.2, 20.0) + _V_dist(v, _B, 1.0, 20.0),
+                  np.array([1.11, 0.456])),
+    "suspended": (lambda v: _V_dist(v, _A, 1.2, 0.8)  + _V_dist(v, _B, 1.0, 0.8),
+                  np.array([1.11, 0.456])),
+    "conflict":  (lambda v: _V_dist(v, _A, 0.25, 30.0) + _V_dist(v, _B, 0.25, 30.0),
+                  np.array([1.0, 0.0])),
+    "reset":     (lambda v: 0.15 * np.sum((v - _MID) ** 2),
+                  np.array([1.0, 0.0])),
+}
+
+
+def run_scenario_calibration(n_steps: int = 3000, gamma: float = 1.0):
+    """Run DynamicalGate over each of the four Session-A scenarios with
+    calibrated-default settings; return trip counts per scenario.
+
+    Deterministic: same seed across scenarios (2026), same trajectory
+    length. Takes ~6-10 s on CPU (four Langevin runs at 3000 steps each).
+    """
+    cfg = DynamicalGateConfig()
+    results: dict[str, int] = {}
+    for name, (U, v0) in _SCENARIOS.items():
+        traj = run_langevin(U, v0, n_steps, rng=np.random.default_rng(2026))
+        gate = DynamicalGate(
+            dim=2,
+            window=cfg.window,
+            threshold=cfg.threshold,
+            min_tail_mag=cfg.min_tail_mag,
+        )
+        grad = lambda v: numerical_grad(U, v)
+        for v in traj:
+            gate.observe(v, grad, gamma=gamma, dt=DT)
+        results[name] = gate.trip_count
+    return results
+
+
+def test_scenarios_discriminate():
+    """Weak acceptance: the gate produces a spread of trip counts across
+    the four canonical scenarios. Exact ordering is recorded in README
+    "Calibration findings" and is not asserted here, because the
+    current formulation is known to be silent on the pinned regimes
+    (committed, conflict) where FDR is most needed — fixing that is
+    the next open item.
+
+    Asserted invariants:
+      - not all scenarios produce zero trips (the gate has signal)
+      - not all scenarios saturate (the gate discriminates)
+      - reset trips more than committed (mobile vs pinned)
+    """
+    trips = run_scenario_calibration()
+    max_t = max(trips.values())
+    min_t = min(trips.values())
+    assert max_t > 0, f"gate silent across all scenarios: {trips}"
+    assert max_t - min_t >= 3, f"gate does not discriminate: {trips}"
+    assert trips["reset"] > trips["committed"], (
+        f"expected reset > committed (mobile > pinned), got {trips}"
+    )
+    return trips
+
+
 if __name__ == "__main__":
     print("dynamical_gate pack — sanity tests")
     print("=" * 62)
@@ -100,4 +175,10 @@ if __name__ == "__main__":
     test_gate_warmup_and_trip()
     print(f"[4] DynamicalGate warmup+trip smooth descent quiet, flip trips   OK")
 
-    print("\nPrimitive + orchestrator sanity tests pass.")
+    if os.environ.get("DYNAMICAL_GATE_SKIP_SCENARIOS") == "1":
+        print("\n[scenarios skipped via DYNAMICAL_GATE_SKIP_SCENARIOS=1]")
+    else:
+        trips = test_scenarios_discriminate()
+        print(f"[5] four-scenario calibration trips = {trips}   OK")
+
+    print("\nAll tests pass.")

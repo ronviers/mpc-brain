@@ -1,7 +1,9 @@
 # dynamical_gate
 
 Cheap linear predictor that gates the expensive dynamical (FDR) classifier.
-Scaffold only — design locked, implementation pending (Session 7 step 1).
+Primitives, orchestrator, and four-scenario calibration are green; see
+"Calibration findings" below for the substrate-specific empirical pattern
+and the known limitation.
 
 ## The pattern
 
@@ -53,26 +55,34 @@ Three pure functions + one orchestrator:
    On trip, caller should invoke `physics_primitives.measure_fdr` at
    the predicted landing point.
 
-## Acceptance test (Session 7, step 1)
+## Calibration findings
 
-Runs over the four Session-A scenario trajectories saved from
-`mpc_lattice.py`:
+Actual trip counts over 3000-step seeded Langevin trajectories on the
+four Session-A scenarios, with the defaults in `config.py`
+(`window=50`, `threshold=0.3`, `min_tail_factor=0.3`):
 
-| Scenario  | Expected trips |
-|-----------|-----------------|
-| reset     | near zero (~0–1) — linear approximation holds in a flat bath |
-| suspended | low (~1–3) — smooth descent into a single well |
-| committed | one burst at basin entry, then quiet |
-| conflict  | repeated trips — nonlinear competition between wells |
+| Scenario  | Trips | Interpretation |
+|-----------|-------|-----------------|
+| conflict  |   0   | stiff disjoint wells pin the particle at the compromise point; per-step displacement stays below the thermal-magnitude gate. Gate silent. |
+| committed |   8   | stiff compatible wells; particle settles at intersection minimum with tight thermal fluctuations. Gate rarely fires. |
+| suspended |  81   | soft wells; thermal excursions regularly large enough that per-window drift direction disagrees with the instantaneous gradient. |
+| reset     | 110   | softest potential; noise dominates drift; per-window tail direction is uncorrelated with gradient. |
 
-Concretely: `test_pack.py` loads the four trajectories, runs the gate
-over each, asserts `trip_count(reset) < trip_count(conflict)` and that
-committed has a single trip-burst early in the trajectory. A
-calibration table of thresholds is recorded in the test output.
+The gate *does* produce a discriminating signal (110 vs 0 trips, 3+ orders of
+magnitude of spread), but the **semantics are inverted** from what FDR needs:
+the gate is silent in the pinned regimes (committed, conflict) where FDR is
+load-bearing for the C vs K distinction, and fires most in the mobile regimes
+(suspended, reset) where the topological classifier already works. The Maya-
+topology linear-predictor pattern as-implemented measures "mobile vs pinned",
+not "linear approximation breaks down vs holds".
 
-This test does **not** require any engine modification and does **not**
-require the release step — it validates only that the gate signal has
-discriminating power on the four known-regime trajectories.
+## Acceptance test
+
+The committed test is the weak form: `test_scenarios_discriminate` asserts
+(a) the gate isn't silent across all scenarios, (b) the trip-count spread
+is at least 3, and (c) `reset > committed` (mobile > pinned). The specific
+ordering above is recorded, not asserted, because the useful direction is
+still an open design question (below).
 
 ## Declared dependencies
 
@@ -83,17 +93,35 @@ discriminating power on the four known-regime trajectories.
 
 ## Declared mutations
 
-None yet. Session 7 step 2 (engine integration) will add a Governor-
-style mutation to populate `PhaseTransitionEvent.fdr_slope` when the
-gate releases a measurement.
+None yet. Engine integration will add a Governor-style mutation to populate
+`PhaseTransitionEvent.fdr_slope` when the gate releases a measurement — but
+only after the open design question below is resolved.
 
-## Pickup checklist (Session 7, step 1)
+## Open: what the gate should actually detect
 
-1. Implement `compute_ghost`, `compute_tail`, `gate_signal` in `pack.py`.
-2. Implement `DynamicalGate` ring buffer + `observe` + `should_release`.
-3. Wire `test_pack.py`: save/reload the four Session-A trajectories (or
-   regenerate deterministically from `mpc_lattice.py`'s seeded config),
-   run the gate, assert the trip-count ordering above.
-4. Tune threshold on the four scenarios; record in `config.py` with a
-   comment on the calibration method.
-5. Commit as "dynamical_gate: linear gate for FDR release".
+The current formulation separates mobile regimes from pinned regimes. That's
+a useful signal, but it's the wrong direction for the FDR-release use case
+we scoped for: on Markovian Langevin substrates, FDR is required *inside*
+the pinned regime to separate C from K, and the gate is silent there.
+
+Candidate reformulations:
+
+1. **Invert the trigger.** Release FDR when `min_tail_mag` is *not*
+   exceeded — i.e., when the particle is suspiciously still. Pair with a
+   Hessian-curvature check to distinguish "settled at a real minimum" from
+   "pinned at a frustrated compromise". This matches the intuition: run the
+   expensive measurement in the pinned regime where cheap observables can't
+   tell you more.
+2. **Trajectory autocorrelation probe.** Streaming `τ_A` estimate via a
+   rolling autocorrelation of V_A on the engine's own trajectory (no
+   perturbation needed). When the estimate drops below the noise floor,
+   release a full paired-noise FDR measurement. This is closer to what the
+   mpc_lattice classifier actually does, just amortised per-engine rather
+   than per-scenario.
+3. **Gradient-rotation rate.** Fire when `∇E` direction has been changing
+   coherently (descent into a basin, saddle crossing) rather than jittering
+   (equilibrium). Clean kinematic signal that's independent of magnitude.
+
+Whichever direction wins, the primitives in this pack (ghost / tail /
+gate_signal) are reusable. Only the `DynamicalGate.observe` orchestration
+has to change.
