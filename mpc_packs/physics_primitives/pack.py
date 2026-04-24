@@ -1,26 +1,18 @@
-#!/usr/bin/env python3
-"""
-physics_primitives.py — validated core observables for the MPC Langevin rig
-===========================================================================
+"""physics_primitives — validated core observables for the MPC Langevin rig.
 
-This module is the distilled output of a prototyping session that worked out
-the core observables for the dynamical MPC framework. Three prototypes were
-built and tested on the four-scenario geometry (committed / suspended /
-conflict / reset); the findings are documented in PROTOTYPE_FINDINGS.md.
+Moved verbatim from docs/dynamical-track/physics_primitives.py (Task A,
+SESSION_A_STATE.md). Do not edit without re-running the four-scenario
+validation in mpc_lattice.py; the constants and integrator parameters are
+load-bearing.
 
-The primitives in this file are what survived. Import them into the full
-mpc_lattice.py rebuild and extend — do not rewrite.
+Public primitives:
 
-    from physics_primitives import (
-        run_langevin, run_paired,
-        autocorr_fft, tau_integral,
-        correlation_time, survival_margin, cross_dissipation,
-        measure_fdr,
-    )
-
-Run standalone for a sanity check:
-
-    python3 physics_primitives.py
+    run_langevin, run_paired,
+    autocorr_fft, tau_integral,
+    correlation_time, survival_margin, cross_dissipation,
+    measure_fdr,
+    numerical_grad,
+    K_BT, DT, D_EFF
 """
 
 import numpy as np
@@ -215,54 +207,3 @@ def measure_fdr(U_base, U_pert, V_obs, v0, h_mag,
                   axis=0)
 
     return np.arange(n_resp) * dt, C, chi
-
-
-# ── Sanity checks ───────────────────────────────────────────────────────────
-if __name__ == '__main__':
-    print("physics_primitives.py — sanity checks")
-    print("=" * 62)
-
-    # ── 1. Harmonic well, analytical prediction for τ_V ─────────────────
-    # For overdamped Langevin in U = (1/2) k |v|², v(t) is an
-    # Ornstein–Uhlenbeck process with relaxation rate k. V = |v|² is a
-    # quadratic function of a Gaussian process; its autocorrelation
-    # decays at rate 2k, so τ_V = 1/(2k).
-    v0 = np.array([0.0, 0.0])
-    U_harm = lambda v: 0.5 * np.sum(v ** 2)
-    V_sq   = lambda v: np.sum(v ** 2)
-
-    print("\n[1] Harmonic well k=1:  expected τ_V = 0.5")
-    traj = run_langevin(U_harm, v0, 6000, rng=np.random.default_rng(42))
-    print(f"    measured τ_V = {correlation_time(V_sq, traj):.4f}")
-
-    # ── 2. Survival margin between stronger and weaker wells ────────────
-    print("\n[2] Survival margin: strong well (k=4) vs weak well (k=0.5)")
-    U_strong = lambda v: 2.00 * np.sum(v ** 2)
-    U_weak   = lambda v: 0.25 * np.sum(v ** 2)
-    ts = run_langevin(U_strong, v0, 6000, rng=np.random.default_rng(10))
-    tw = run_langevin(U_weak,   v0, 6000, rng=np.random.default_rng(11))
-    gamma, tA, tE = survival_margin(V_sq, ts, tw)
-    print(f"    τ_strong = {tA:.4f}   τ_weak = {tE:.4f}   γ = {gamma:+.4f}")
-    print(f"    (stiffer well → shorter τ → γ > 0 in a Markovian substrate;")
-    print(f"     paper sign-inversion caveat applies — see FINDINGS §1)")
-
-    # ── 3. FDR on harmonic well — should exhibit FDT ────────────────────
-    # In the overdamped-Langevin convention of this code, the effective
-    # temperature is D_EFF (not K_BT); Einstein relation gives variance
-    # ⟨v²⟩ = D/k in equilibrium, so FDT slope = 1/D_EFF in [C(0)−C]/K_BT
-    # units. With D_EFF = 0.3, FDT predicts slope ≈ 3.33.
-    print(f"\n[3] FDR on harmonic well — expected slope ≈ {1/D_EFF:.2f}")
-    print(f"    (FDT holds; slope = 1/D_EFF in these natural units)")
-    h = 0.3
-    U_base = lambda v: 0.5 * np.sum(v ** 2)
-    U_pert = lambda v: 0.5 * np.sum((v - np.array([h, 0.0])) ** 2)
-    V_x    = lambda v: v[0]
-    tau, C, chi = measure_fdr(U_base, U_pert, V_x, v0, h,
-                              n_burnin=1000, n_resp=1500, n_reps=24, seed=7)
-    x_end = (C[0] - C[-100:].mean()) / K_BT
-    y_end = chi[-100:].mean()
-    print(f"    late-time [C(0)−C]/kT = {x_end:.4f}   χ = {y_end:.4f}")
-    print(f"    measured slope = {y_end / (x_end + 1e-12):.3f}  "
-          f"(predicted {1/D_EFF:.2f})")
-
-    print("\nAll primitives working. Ready for the full rig build.")

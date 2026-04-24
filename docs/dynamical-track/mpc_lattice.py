@@ -47,8 +47,9 @@ from matplotlib.patches import Circle
 from matplotlib.lines import Line2D
 from scipy.optimize import minimize as scipy_minimize
 
-# Import validated primitives.  Do NOT duplicate them here.
-from physics_primitives import (
+# Import validated primitives from the canonical pack.  Run this script from
+# the repo root so mpc_packs/ is importable:  python docs/dynamical-track/mpc_lattice.py
+from mpc_packs.physics_primitives import (
     run_langevin,
     autocorr_fft,
     tau_integral,
@@ -1138,7 +1139,7 @@ def _hr(char='─', n=66): return char * n
 
 def main(outdir=None):
     t_start = __import__('time').time()
-    outdir = outdir or os.getcwd()
+    outdir = outdir or os.path.dirname(os.path.abspath(__file__))
     os.makedirs(outdir, exist_ok=True)
 
     print(_hr('═'))
