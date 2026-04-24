@@ -117,6 +117,53 @@ def _build_maze_rules(
         # Predicate said "different" but diff is empty: defensive noop.
         return Action(kind="noop", cluster_id=cid, payload={})
 
+    # ── M6: idle → prune farthest-from-goal loaded cell  (Session 10) ────────
+    #
+    # The agent settles at the centroid of the M2-loaded cells and stops
+    # advancing because the basin is symmetric. M6 breaks the symmetry: when
+    # idle, drop the cell label whose Manhattan distance to the goal is
+    # largest, while leaving the agent's current cell loaded. Net effect:
+    # the basin shifts forward, the agent has 20 substrate steps with the
+    # asymmetric pull before M2's next plan_step re-adds the dropped cell.
+    #
+    # Priority is M2-then-M6: M2 always keeps the agent_cell + neighbours in
+    # sync first, so M6 only fires once that bookkeeping settles. M6 is
+    # before M3 because expanding (M3) without first contracting (M6) just
+    # widens an already-stable basin.
+
+    def m6_pred(signals, cluster, network) -> bool:
+        if signals.get("idle", 0.0) <= 0.5:
+            return False
+        agent_cell = maze.position_to_cell(cluster.engines[0].v)
+        cell_handles = _loaded_cell_labels(cluster)
+        # Need a candidate that is NOT the agent's current cell.
+        for label in cell_handles:
+            if _label_to_cell(label) != agent_cell:
+                return True
+        return False
+
+    def m6_factory(cid, signals, cluster, network) -> Action:
+        agent_cell = maze.position_to_cell(cluster.engines[0].v)
+        cell_handles = _loaded_cell_labels(cluster)
+        candidates = [
+            lbl for lbl in cell_handles
+            if _label_to_cell(lbl) != agent_cell
+        ]
+        if not candidates:
+            return Action(kind="noop", cluster_id=cid, payload={})
+        gc, gr = maze.goal
+
+        def goal_dist(label: str) -> int:
+            c, r = _label_to_cell(label)
+            return abs(c - gc) + abs(r - gr)
+
+        farthest = max(candidates, key=goal_dist)
+        return Action(
+            kind="remove_proposition",
+            cluster_id=cid,
+            payload={"label": farthest},
+        )
+
     # ── M3: idle + saturated exploration → expand 2-hop neighbourhood ────────
 
     def m3_pred(signals, cluster, network) -> bool:
@@ -178,6 +225,7 @@ def _build_maze_rules(
     return [
         (m1_pred, m1_factory),
         (m2_pred, m2_factory),
+        (m6_pred, m6_factory),
         (m3_pred, m3_factory),
         (m4_pred, m4_factory),
         (m5_pred, m5_factory),
