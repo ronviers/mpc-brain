@@ -66,71 +66,14 @@ class ConstraintHandle:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Calorimeter  —  RFC-001 §7  (passive subscriber, no brain references)
+#  Calorimeter  —  RFC-001 §7  (passive subscriber)
+#
+#  Canonical Calorimeter now lives in mpc_kernel.rfc001.network. Re-exported
+#  here so the monolith's pre-RFC-002 API is preserved and subscribers bind
+#  to a single class object across kernel and monolith import paths.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class Calorimeter:
-    """
-    RFC-001 §7 — Passive measurement subscriber.
-
-    Attach to any EventBus via .attach(bus).
-    MUST NOT hold a reference to any brain component.
-    MUST NOT call any method on any brain component.
-    Exposes get_heat_flux(cluster_id) for the Governor (RFC-001 §7, §8.4).
-    """
-
-    def __init__(self, kT: float = 1.0, window: int = 30):
-        self.kT = kT
-        self._window = window
-        self.total_landauer = 0.0
-        self.transitions: List[PhaseTransitionEvent] = []
-        self._flux_buf:   Dict[str, List[float]] = {}
-        self.heat_flux:   Dict[str, float] = {}
-
-    def attach(self, bus: EventBus) -> "Calorimeter":
-        """
-        Subscribe to all RFC-001 §6 event types.
-        Returns self for chaining.  MUST be called exactly once per bus.
-        """
-        bus.subscribe(PhaseTransitionEvent, self._on_transition)
-        bus.subscribe(LandauerEvent,        self._on_landauer)
-        bus.subscribe(BudgetResetEvent,     self._on_reset)
-        return self
-
-    def get_heat_flux(self, cluster_id: str) -> float:
-        return self.heat_flux.get(cluster_id, 0.0)
-
-    def clear_flux(self, cluster_id: str):
-        self._flux_buf.pop(cluster_id, None)
-        self.heat_flux.pop(cluster_id, None)
-
-    def report(self) -> str:
-        n      = len(self.transitions)
-        resets = sum(1 for t in self.transitions if t.to_phase == Phase.R)
-        return (
-            f"Calorimeter: {n} transitions, {resets} resets, "
-            f"total Landauer cost = {self.total_landauer:.4f} kT·ln2"
-        )
-
-    def _on_transition(self, e: PhaseTransitionEvent):
-        self.transitions.append(e)
-
-    def _on_landauer(self, e: LandauerEvent):
-        cost = e.info_content * e.kT * np.log(2)
-        self.total_landauer += cost
-        self._push_flux(e.cluster_id, cost)
-
-    def _on_reset(self, e: BudgetResetEvent):
-        cost = e.info_cost * self.kT * np.log(2)
-        self.total_landauer += cost
-        self._push_flux(e.cluster_id, cost)
-
-    def _push_flux(self, cluster_id: str, heat: float):
-        buf = self._flux_buf.setdefault(cluster_id, [])
-        buf.append(heat)
-        if len(buf) > self._window:
-            buf.pop(0)
-        self.heat_flux[cluster_id] = float(np.mean(buf))
+from mpc_kernel.rfc001.network import Calorimeter
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
