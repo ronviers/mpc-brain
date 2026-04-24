@@ -356,10 +356,19 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
   `async_release=True` keeps `measure_fdr` off the stepping critical
   path (~23× stepping speedup, slope byte-identical). Full Session-A
   rig reproduces via `python docs/dynamical-track/mpc_lattice.py`.
-- **Latest green experiment:** `experiments/maze/` now runs
-  `DynamicalEngine` as a drop-in for `InstrumentedEngine` via the
-  `USE_DYNAMICAL_ENGINE = True` toggle. All six TASK-5 acceptance
-  criteria PASS.
+- **Latest green experiment:** `experiments/maze/` runs
+  `DynamicalEngine` as a drop-in for `InstrumentedEngine`. All six
+  TASK-5 acceptance criteria PASS. After Session 10's M6 rule +
+  stiffness tuning, the agent actually traverses the maze: reaches
+  cell (4,4) in 1500 steps and within 1 cell of the goal (5,6) in
+  3000 steps on the 7×7 maze (A* path length 27). Before M6: 3
+  cells, 0 commits, trapped at (1,1).
+- **Tolman battery** scaffolded at `experiments/tolman/`
+  (`latent_learning.py` runs; detour / shortcut / reversal queued).
+- **Real-time browser visualizer** at `H:\mpc-visualizer\` shows
+  the engine traversing procedural mazes live with phase-color-coded
+  agent, FDR gate state, streaming charts, and scrolling action log.
+  `python H:\mpc-visualizer\server.py` then open <http://localhost:18765>.
 
 ---
 
@@ -376,8 +385,9 @@ RFC-002 is normative as of April 2026. Kernel at `0.4.0`.
 | 7 | Streaming-τ `dynamical_gate` pack: edge-triggered FDR release, `StreamingObservables` companion, `DynamicalEngine(MetastableEngine)` drop-in that auto-populates `PhaseTransitionEvent.fdr_slope`. One failed design (Maya mobility gate) shelved as `mobility_detector`. | complete |
 | 8 | Async release worker. Top-level session-monolith shims + unified event / `Calorimeter` type identity. First-class packs carved: `jax_substrate`, `auto_cluster`, `effector`, `decaying_substrate` (promoted from shim). `DynamicalEngine` in the maze experiment; all six TASK-5 criteria PASS. | complete |
 | 9 | Final S2/S3/S4 carve-out closes the shim era: `lateral_cluster`, `observation_socket`, `llm_encoder`, `persistence_substrate` (promoted from shim). `InstrumentedEngine` retired to an alias of `MetastableEngine`. Twelve first-class packs total. | complete |
-| 10 | Maze determinism / seeding. Tolman experimental battery (latent learning, detour, shortcut, reversal). Optional: audit / retire `mpc_engine_rfc001.py` parallel implementations. | planned |
-| 11 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
+| 10 | Maze determinism (seeded RNG). Monolith unification closes the last parallel implementations (Substrate, MetastableEngine, MPCCluster, Network all re-exported from kernel; `mpc_engine_rfc001.py` 997→233 LOC). **M6 forebrain rule** unblocks traversal; stiffness tuning gets agent to within 1 cell of goal. Tolman latent-learning scaffold. Thread-safety fix on async FDR release. | complete |
+| 11 | Full Tolman battery (detour, shortcut, reversal). Traversal-completion polish — either extend step budget or add an M7 goal-adjacent boost. Visualizer polish (replay, video export, per-event maze highlights). | planned |
+| 12 | Parallel mazes. Cross-cluster routing on transfer. First multi-substrate experiment. | planned |
 | 9+ | Persistence-doc packs land per RFC-002 Appendix A. | queued |
 
 The cleanest stopping condition: if Session 7's behavioural curves
