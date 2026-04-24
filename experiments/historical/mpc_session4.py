@@ -51,9 +51,11 @@ from mpc_engine_rfc001 import (  # noqa: E402
     Phase, EventBus, Substrate,
     MetastableEngine, MPCCluster, Calorimeter,
     ConstraintHandle, LandauerEvent, BudgetResetEvent,
+    PhaseTransitionEvent,
 )
-# Intentionally NOT importing PhaseTransitionEvent from S1 here — it is shadowed
-# below by an extended dataclass carrying an `energy` field (see AMEND-005).
+# The S4 shadow of PhaseTransitionEvent has been retired — the canonical
+# kernel type (re-exported by mpc_engine_rfc001) now carries the `energy`
+# field that AMEND-005 originally added as a shadow.
 
 from mpc_session2 import (  # noqa: E402
     JAXSubstrate, AutoCluster, LLMConstraintEncoder,
@@ -69,36 +71,20 @@ log = logging.getLogger(__name__)
 
 
 # =============================================================================
-#  Step 1 — Extended PhaseTransitionEvent (AMEND-005 protocol change)
+#  Step 1 — PhaseTransitionEvent (AMEND-005 — energy field)
 # =============================================================================
 #
-# RFC-001 §6 defines PhaseTransitionEvent with five fields.  AMEND-005 adds a
-# sixth — energy — so that the Effector can read E(v_c) at commitment time
-# without ever touching a Substrate.  Because mpc_engine_rfc001.py and
-# mpc_session3.py cannot be modified, we redefine PhaseTransitionEvent *inside
-# this module* with the extra field, and have InstrumentedEngine emit the
-# extended version.
+# The S4 spec added an `energy` field to PhaseTransitionEvent so the Effector
+# can read E(v_c) at commitment time without touching a Substrate. That
+# field now lives on the canonical kernel type (carved in Session 6); this
+# module imports it from mpc_engine_rfc001 (which re-exports the kernel
+# version). The original S4 shadow class has been retired — Session 4's
+# transitional type-split is no longer needed because all three sources
+# (kernel, monolith, S4) now yield the same class object.
 #
-# Consequence: subscribers that were registered with the S1 PhaseTransitionEvent
-# type key (e.g. a stock Calorimeter) will NOT receive events from
-# InstrumentedEngine — the type objects are distinct.  Session 4 never attaches
-# a Calorimeter, so this is harmless here.  Components that need to be driven
-# by these events (the Effector, PersistenceCluster) subscribe to the S4 type
-# defined here.
-
-@dataclass
-class PhaseTransitionEvent:
-    """S4-extended phase-transition event (AMEND-005).
-
-    Identical to mpc_engine_rfc001.PhaseTransitionEvent in shape, plus:
-      energy: E(v) at the post-update position, evaluated by the emitter.
-    """
-    from_phase:  Phase
-    to_phase:    Phase
-    position:    np.ndarray
-    timestamp:   float
-    cluster_id:  str
-    energy:      float = 0.0
+# Subscribers that bind to mpc_engine_rfc001.PhaseTransitionEvent,
+# mpc_kernel.rfc001.events.PhaseTransitionEvent, or this module's
+# PhaseTransitionEvent all receive events from InstrumentedEngine.
 
 
 # =============================================================================

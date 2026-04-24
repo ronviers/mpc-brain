@@ -20,64 +20,25 @@ log = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Phase  —  RFC-001 §3 (non-amendable)
+#  Phase, Events, and EventBus  —  RFC-001 §3, §6
+#
+#  Canonical definitions now live in mpc_kernel.rfc001 (carved in Session 6).
+#  Re-exported here so this monolith keeps its pre-RFC-002 API while
+#  downstream subscribers bind to a single type identity across the kernel,
+#  this monolith, and the Session-4 InstrumentedEngine.
+#
+#  The kernel PhaseTransitionEvent adds `energy: float = 0.0` (AMEND-005,
+#  Session 4) and `fdr_slope: Optional[float] = None` (Session 6). Both
+#  fields default, so S1-era five-argument constructors still work.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class Phase(Enum):
-    C = "c"   # committed  — deep minimum, high revision cost
-    S = "s"   # suspended  — metastable, active maintenance required
-    K = "k"   # conflict   — no satisfying configuration, elevated cost
-    R = "r"   # reset      — maximally entropic prior, V_A ≡ 0
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Event Bus & Events  —  RFC-001 §6
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@dataclass
-class PhaseTransitionEvent:
-    from_phase:  Phase
-    to_phase:    Phase
-    position:    np.ndarray
-    timestamp:   float
-    cluster_id:  str
-
-@dataclass
-class LandauerEvent:
-    cluster_id:   str
-    info_content: float    # bits erased; Q ≥ kT·ln2 per bit (RFC-001 §3.2)
-    kT:           float = 1.0
-
-@dataclass
-class BudgetResetEvent:
-    cluster_id:  str
-    position:    np.ndarray
-    timestamp:   float
-    info_cost:   float = 1.0   # 1 bit per reset (RFC-001 §3.3)
-
-
-class EventBus:
-    """
-    RFC-001 §6 — Minimal pub/sub separating brain from measurement.
-
-    Brain classes call bus.emit(event).  Subscribers receive it.
-    EventBus.null() silently drops all events — use in tests where
-    measurement is not the subject under test.
-    """
-
-    def __init__(self):
-        self._handlers: Dict[type, List[Callable]] = {}
-
-    def subscribe(self, event_type: type, handler: Callable):
-        self._handlers.setdefault(event_type, []).append(handler)
-
-    def emit(self, event: Any):
-        for h in self._handlers.get(type(event), []):
-            h(event)
-
-    @staticmethod
-    def null() -> "EventBus":
-        return EventBus()
+from mpc_kernel.rfc001.phase import Phase
+from mpc_kernel.rfc001.events import (
+    PhaseTransitionEvent,
+    LandauerEvent,
+    BudgetResetEvent,
+)
+from mpc_kernel.rfc001.bus import EventBus
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
