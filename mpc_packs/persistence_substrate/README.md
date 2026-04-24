@@ -1,33 +1,67 @@
-# persistence_substrate — transitional shim
+# persistence_substrate
 
-**Transitional shim. Replace in S6 with a first-class pack when the kernel carve-out lands.**
+First-class pack for AMEND-006: `PersistenceSubstrate` (usage-modulated
+τ + active reinforcement) and `PersistenceCluster` (LateralCluster
+backed by PersistenceSubstrate with traversal recording and
+outcome-driven reinforcement on phase-C transitions).
 
-Re-exports `PersistenceSubstrate`, `PersistenceCluster`, `Effector`,
-`InstrumentedEngine`, and `EffectorEvent` from `mpc_session4` unchanged.
-No new behaviour. No new mutations.
+**Status:** first-class pack (Session 9 carve-out). Previously a
+transitional shim over `mpc_session4`.
 
-## Import guidance for 5b's maze experiment
+## AMEND-006 in one page
 
-```python
-from mpc_packs.persistence_substrate.pack import (
-    PersistenceCluster, Effector, InstrumentedEngine, EffectorEvent,
-)
+**Usage modulation.** `PersistenceSubstrate` extends the
+AMEND-001 decay law with a traversal-frequency term:
+
+```
+τ_ij = (tau_base / min(λ_i, λ_j)) · (1 + usage_coefficient · freq_ij)
+freq_ij = _traversal[(i,j)] / max(_total_traversals, 1)
 ```
 
-Note that `Effector` subscribes to `mpc_session4.PhaseTransitionEvent`
-(the S4 shadow dataclass with `energy: float = 0.0`), **not** the
-kernel one — this is why `PersistenceCluster` spawns `InstrumentedEngine`
-instances that emit the S4 event type. See Session 5a handoff notes and
-RFC-001-AMENDMENTS-B item 1 (deferred housekeeping).
+Edges traversed more often decay more slowly. Passive rehearsal.
+
+**Active reinforcement.** On every phase-C transition,
+`PersistenceCluster._on_phase_transition` calls
+`PersistenceSubstrate.apply_outcome(pid)` where `pid` is the nearest-
+well at commit time. For every pair `(pid, other)` currently in the
+decay cache:
+
+```
+ε_ij ← min(ε_ij + outcome_coefficient · ε_original, ε_original)
+```
+
+Edges containing the committing well get boosted (capped at original).
+
+## Contents re-exported for backward compatibility
+
+```
+PersistenceSubstrate   (first-class, this pack)
+PersistenceCluster     (first-class, this pack)
+Effector               ← mpc_packs.effector
+EffectorEvent          ← mpc_packs.effector
+InstrumentedEngine     ← mpc_session4 (retirement deferred)
+```
 
 ## Declared dependencies
 
-- `mpc_session4.PersistenceSubstrate`
-- `mpc_session4.PersistenceCluster`
-- `mpc_session4.Effector`
-- `mpc_session4.InstrumentedEngine`
-- `mpc_session4.EffectorEvent`
+- `numpy`
+- `mpc_kernel.rfc001.events.{EventBus, PhaseTransitionEvent}`
+- `mpc_kernel.rfc001.phase.Phase`
+- `mpc_packs.decaying_substrate.DecayingSubstrate` (PersistenceSubstrate parent)
+- `mpc_packs.lateral_cluster.LateralCluster` (PersistenceCluster parent)
+- `mpc_packs.observation_socket.ObservationSocket` (optional, via LateralCluster)
+- `mpc_session4.InstrumentedEngine` (engine class used by PersistenceCluster)
 
 ## Declared mutations
 
-None (pure re-export).
+- `PersistenceSubstrate`: `self._traversal`, `self._total_traversals`,
+  `self._original_eps`, inherited `_decay_cache`/`_active_pairs`.
+- `PersistenceCluster`: `self.sub`/`self.ops.sub` (replaced with
+  PersistenceSubstrate), `self.engines` (replaced with
+  InstrumentedEngines), `self._prev_pids`, bus subscription to
+  `PhaseTransitionEvent`.
+
+## Provenance
+
+Verbatim port from `experiments/historical/mpc_session4.py`
+lines 270–515.
