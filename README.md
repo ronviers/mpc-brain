@@ -405,5 +405,5 @@ physical invariants in §3 are not amendable. Amendments to RFC-002 follow
 the promotion rules in §5. Comments and objections are invited in the
 spirit stated in the foundational paper: as tests, not obstacles.
 
-Developed collaboratively between a hobbyist researcher and Claude (Anthropic),
+Developed collaboratively with Claude, Gemini, Kimi and ChatGPT
 April 2026.
