@@ -29,7 +29,7 @@ EXPERIMENT_CONFIG = {
     "e_star_init": 8.0,
     "max_engines": 2,
     "n_steps": 1500,
-    "plan_interval": 20,
+    "plan_interval": 10,          # Session 10 tune 3: halved from 20; M6/M2 fire 2x faster, reach goal at step 3062 (was 3726)
     "goal_stiffness": 0.5,        # Session 10 tune 2: further sweep, reaches goal at step 3726 (was 4242 at gs=0.3)
     "neighbour_stiffness": 0.1,   # Session 10: swept down from 0.4; gs/ns ratio drives traversal speed
     # Additional config items from v2 §TASK-5 configuration block.
